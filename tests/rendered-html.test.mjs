@@ -23,7 +23,7 @@ async function render() {
   );
 }
 
-test("server-renders the stock valuation dashboard", async () => {
+test("server-renders the sortable stock overview grid", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
@@ -32,7 +32,10 @@ test("server-renders the stock valuation dashboard", async () => {
   assert.match(html, /<html lang="zh-CN">/i);
   assert.match(html, /<title>估值刻度｜股票分层买入区间<\/title>/i);
   assert.match(html, /招商证券/);
-  assert.match(html, /固定 5 层 · 绿 → 红/);
+  assert.match(html, /股票网格/);
+  assert.match(html, /估值：绿 → 红/);
+  assert.match(html, /按估值颜色/);
+  assert.match(html, /查看招商证券详情/);
   assert.match(html, /数据已从 SQLite 快照载入/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/);
 });
