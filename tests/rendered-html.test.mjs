@@ -32,10 +32,11 @@ test("server-renders the sortable stock overview grid", async () => {
   assert.match(html, /<html lang="zh-CN">/i);
   assert.match(html, /<title>估值刻度｜股票分层买入区间<\/title>/i);
   assert.match(html, /招商证券/);
-  assert.match(html, /股票网格/);
+  assert.match(html, /一只股票，一个格子/);
   assert.match(html, /估值：绿 → 红/);
-  assert.match(html, /按估值颜色/);
+  assert.match(html, /价格：低 → 高/);
   assert.match(html, /查看招商证券详情/);
+  assert.equal((html.match(/class="stock-card"/g) ?? []).length, 6);
   assert.match(html, /数据已从 SQLite 快照载入/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/);
 });

@@ -7,8 +7,7 @@ const bandColors = ["#28a873", "#9bc85b", "#edc84f", "#ef8d45", "#e2544f"];
 const bandSoftColors = ["#e9f6ef", "#f2f8e7", "#fff8dd", "#fff0e4", "#fdebea"];
 const bandDescriptions = ["低估可买", "偏低可布局", "合理观察", "偏高谨慎", "高估回避"];
 
-type SortKey = "level-asc" | "level-desc" | "name" | "symbol";
-type GroupKey = "valuation" | "industry" | "none";
+type SortKey = "level-asc" | "level-desc" | "name" | "symbol" | "price-asc" | "price-desc" | "industry";
 
 function getCurrentBand(stock: Stock) {
   return (
@@ -63,8 +62,6 @@ export function StockDashboard({ stocks }: { stocks: Stock[] }) {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("level-asc");
-  const [groupBy, setGroupBy] = useState<GroupKey>("valuation");
-  const [levelFilter, setLevelFilter] = useState<number | null>(null);
 
   const activeStock = activeId === null
     ? null
@@ -86,8 +83,7 @@ export function StockDashboard({ stocks }: { stocks: Stock[] }) {
         stock.name.toLocaleLowerCase("zh-CN").includes(normalized) ||
         stock.symbol.toLocaleLowerCase("zh-CN").includes(normalized) ||
         stock.industry.toLocaleLowerCase("zh-CN").includes(normalized);
-      const matchesLevel = levelFilter === null || getCurrentBand(stock).level === levelFilter;
-      return matchesText && matchesLevel;
+      return matchesText;
     });
 
     return [...matches].sort((a, b) => {
@@ -98,32 +94,14 @@ export function StockDashboard({ stocks }: { stocks: Stock[] }) {
         return getCurrentBand(b).level - getCurrentBand(a).level || collator.compare(a.name, b.name);
       }
       if (sortBy === "symbol") return collator.compare(a.symbol, b.symbol);
+      if (sortBy === "price-asc") return a.currentPrice - b.currentPrice;
+      if (sortBy === "price-desc") return b.currentPrice - a.currentPrice;
+      if (sortBy === "industry") {
+        return collator.compare(a.industry, b.industry) || collator.compare(a.name, b.name);
+      }
       return collator.compare(a.name, b.name);
     });
-  }, [levelFilter, query, sortBy, stocks]);
-
-  const groupedStocks = useMemo(() => {
-    if (groupBy === "none") return [{ key: "all", title: "全部股票", stocks: visibleStocks }];
-
-    if (groupBy === "industry") {
-      const groups = new Map<string, Stock[]>();
-      visibleStocks.forEach((stock) => {
-        groups.set(stock.industry, [...(groups.get(stock.industry) ?? []), stock]);
-      });
-      return [...groups.entries()]
-        .sort(([a], [b]) => a.localeCompare(b, "zh-CN"))
-        .map(([title, groupStocks]) => ({ key: title, title, stocks: groupStocks }));
-    }
-
-    const levels = sortBy === "level-desc" ? [5, 4, 3, 2, 1] : [1, 2, 3, 4, 5];
-    return levels
-      .map((level) => ({
-        key: `level-${level}`,
-        title: `第 ${level} 层 · ${stocks[0]?.bands[level - 1]?.name ?? bandDescriptions[level - 1]}`,
-        stocks: visibleStocks.filter((stock) => getCurrentBand(stock).level === level),
-      }))
-      .filter((group) => group.stocks.length > 0);
-  }, [groupBy, sortBy, stocks, visibleStocks]);
+  }, [query, sortBy, stocks]);
 
   const openStock = (id: number) => {
     setActiveId(id);
@@ -272,55 +250,29 @@ export function StockDashboard({ stocks }: { stocks: Stock[] }) {
       </header>
 
       <section className="overview-page" id="top">
-        <div className="overview-hero">
+        <div className="overview-heading">
           <div>
             <span className="eyebrow">股票估值总览</span>
-            <h1>先看颜色，再看公司</h1>
-            <p>从绿到红快速浏览估值位置，筛出值得进一步研究的股票。</p>
+            <h1>一只股票，一个格子</h1>
+            <p>所有股票在同一张网格里，切换排序条件即可重新排列。</p>
           </div>
-          <div className="legend" aria-label="估值颜色说明">
-            <span>低估可买</span>
-            <i />
-            <i />
-            <i />
-            <i />
-            <i />
-            <span>高估回避</span>
+          <div className="valuation-breakdown" aria-label="估值层级分布">
+            {bandCounts.map(({ level, count }) => (
+              <span key={level}>
+                <i style={{ background: bandColors[level - 1] }} />
+                第 {level} 层 <strong>{count}</strong>
+              </span>
+            ))}
           </div>
-        </div>
-
-        <div className="temperature-summary" aria-label="按估值层级筛选">
-          <button
-            className={`summary-all ${levelFilter === null ? "active" : ""}`}
-            type="button"
-            onClick={() => setLevelFilter(null)}
-          >
-            <span>全部</span>
-            <strong>{stocks.length}</strong>
-            <small>只股票</small>
-          </button>
-          {bandCounts.map(({ level, count }) => (
-            <button
-              className={`summary-level ${levelFilter === level ? "active" : ""}`}
-              style={{ "--level-color": bandColors[level - 1], "--level-soft": bandSoftColors[level - 1] } as React.CSSProperties}
-              type="button"
-              onClick={() => setLevelFilter(levelFilter === level ? null : level)}
-              key={level}
-            >
-              <span>第 {level} 层</span>
-              <strong>{count}</strong>
-              <small>{bandDescriptions[level - 1]}</small>
-            </button>
-          ))}
         </div>
 
         <section className="stock-browser" aria-labelledby="stock-browser-title">
           <div className="browser-heading">
             <div>
               <span className="eyebrow">观察池</span>
-              <h2 id="stock-browser-title">股票网格</h2>
+              <h2 id="stock-browser-title">全部股票</h2>
             </div>
-            <p aria-live="polite">显示 {visibleStocks.length} / {stocks.length} 只</p>
+            <p aria-live="polite">{visibleStocks.length} 个格子 · 共 {stocks.length} 只股票</p>
           </div>
 
           <div className="browser-toolbar">
@@ -335,93 +287,71 @@ export function StockDashboard({ stocks }: { stocks: Stock[] }) {
             </label>
 
             <label className="select-control">
-              <span>分组</span>
-              <select value={groupBy} onChange={(event) => setGroupBy(event.target.value as GroupKey)}>
-                <option value="valuation">按估值颜色</option>
-                <option value="industry">按行业</option>
-                <option value="none">不分组</option>
-              </select>
-            </label>
-
-            <label className="select-control">
               <span>排序</span>
               <select value={sortBy} onChange={(event) => setSortBy(event.target.value as SortKey)}>
                 <option value="level-asc">估值：绿 → 红</option>
                 <option value="level-desc">估值：红 → 绿</option>
                 <option value="name">名称：拼音顺序</option>
                 <option value="symbol">股票代码</option>
+                <option value="price-asc">价格：低 → 高</option>
+                <option value="price-desc">价格：高 → 低</option>
+                <option value="industry">行业名称</option>
               </select>
             </label>
           </div>
 
-          <div className="stock-groups">
-            {groupedStocks.map((group) => {
-              const level = groupBy === "valuation" ? getCurrentBand(group.stocks[0]).level : null;
+          <div className="stock-grid overview-stock-grid">
+            {visibleStocks.map((stock) => {
+              const band = getCurrentBand(stock);
+              const color = bandColors[band.level - 1];
               return (
-                <section className="stock-group" key={group.key}>
-                  <div className="group-heading">
-                    <h3>
-                      {level && <i style={{ background: bandColors[level - 1] }} />}
-                      {group.title}
-                    </h3>
-                    <span>{group.stocks.length} 只</span>
-                  </div>
-                  <div className="stock-grid">
-                    {group.stocks.map((stock) => {
-                      const band = getCurrentBand(stock);
-                      const color = bandColors[band.level - 1];
-                      return (
-                        <button
-                          className="stock-card"
-                          style={{ "--stock-color": color, "--stock-soft": bandSoftColors[band.level - 1] } as React.CSSProperties}
-                          type="button"
-                          onClick={() => openStock(stock.id)}
-                          key={stock.id}
-                          aria-label={`查看${stock.name}详情，当前第${band.level}层${band.name}`}
-                        >
-                          <span className="card-color-bar" />
-                          <span className="stock-card-top">
-                            <StockMark symbol={stock.symbol} />
-                            <span className="stock-card-status">第 {band.level} 层 · {band.name}</span>
-                          </span>
-                          <span className="stock-card-name">
-                            <strong>{stock.name}</strong>
-                            <small>{stock.symbol} · {stock.industry}</small>
-                          </span>
-                          <span className="stock-card-price">
-                            <small>参考价格</small>
-                            <strong><b>¥</b>{stock.currentPrice.toFixed(2)}</strong>
-                          </span>
-                          <span className="mini-scale" aria-hidden="true">
-                            {bandColors.map((segmentColor, index) => (
-                              <i
-                                className={index + 1 === band.level ? "current" : ""}
-                                style={{ background: segmentColor }}
-                                key={segmentColor}
-                              />
-                            ))}
-                          </span>
-                          <span className="stock-card-metrics">
-                            <span><small>理想买点</small><strong>{stock.idealPrice}</strong></span>
-                            <span><small>公司质量</small><strong>{stock.quality}</strong></span>
-                          </span>
-                          <span className="stock-card-footer">
-                            <small>{bandDescriptions[band.level - 1]}</small>
-                            <strong>查看详情 <span aria-hidden="true">→</span></strong>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </section>
+                <button
+                  className="stock-card"
+                  style={{ "--stock-color": color, "--stock-soft": bandSoftColors[band.level - 1] } as React.CSSProperties}
+                  type="button"
+                  onClick={() => openStock(stock.id)}
+                  key={stock.id}
+                  aria-label={`查看${stock.name}详情，当前第${band.level}层${band.name}`}
+                >
+                  <span className="card-color-bar" />
+                  <span className="stock-card-top">
+                    <StockMark symbol={stock.symbol} />
+                    <span className="stock-card-status">第 {band.level} 层 · {band.name}</span>
+                  </span>
+                  <span className="stock-card-name">
+                    <strong>{stock.name}</strong>
+                    <small>{stock.symbol} · {stock.industry}</small>
+                  </span>
+                  <span className="stock-card-price">
+                    <small>参考价格</small>
+                    <strong><b>¥</b>{stock.currentPrice.toFixed(2)}</strong>
+                  </span>
+                  <span className="mini-scale" aria-hidden="true">
+                    {bandColors.map((segmentColor, index) => (
+                      <i
+                        className={index + 1 === band.level ? "current" : ""}
+                        style={{ background: segmentColor }}
+                        key={segmentColor}
+                      />
+                    ))}
+                  </span>
+                  <span className="stock-card-metrics">
+                    <span><small>理想买点</small><strong>{stock.idealPrice}</strong></span>
+                    <span><small>公司质量</small><strong>{stock.quality}</strong></span>
+                  </span>
+                  <span className="stock-card-footer">
+                    <small>{bandDescriptions[band.level - 1]}</small>
+                    <strong>查看详情 <span aria-hidden="true">→</span></strong>
+                  </span>
+                </button>
               );
             })}
 
             {visibleStocks.length === 0 && (
               <div className="grid-empty">
                 <strong>没有找到匹配的股票</strong>
-                <p>换一个关键词，或清除上方估值筛选。</p>
-                <button type="button" onClick={() => { setQuery(""); setLevelFilter(null); }}>清除筛选</button>
+                <p>换一个关键词再试试。</p>
+                <button type="button" onClick={() => setQuery("")}>清除搜索</button>
               </div>
             )}
           </div>
