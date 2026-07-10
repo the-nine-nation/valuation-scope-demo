@@ -1,0 +1,344 @@
+[
+  {
+    "id": 1,
+    "symbol": "600999",
+    "name": "招商证券",
+    "market": "上交所",
+    "industry": "证券",
+    "currentPrice": 17.3,
+    "asOf": "2026-06",
+    "quality": "A-",
+    "valuation": "合理偏低",
+    "thesis": "头部综合券商，财富管理和机构业务较强。PE 偏低、股息率有吸引力，但券商利润受市场成交和自营收益影响明显，PB 尚未到极端便宜。",
+    "idealPrice": "¥15–16",
+    "valuationAnchor": "PE 11–12× / PB 1.1–1.25×",
+    "keyRisk": "市场成交额回落、自营收益下降，或 ROE 无法稳定在 10% 附近，会削弱当前估值逻辑。",
+    "bands": [
+      {
+        "level": 1,
+        "name": "深度低估",
+        "rangeLabel": "¥14.5 以下",
+        "lowerBound": null,
+        "upperBound": 14.5,
+        "action": "基本面未恶化时，可重点研究并建立安全边际仓位。"
+      },
+      {
+        "level": 2,
+        "name": "舒适买入",
+        "rangeLabel": "¥14.5–16",
+        "lowerBound": 14.5,
+        "upperBound": 16,
+        "action": "适合按计划分批，股息率也更有吸引力。"
+      },
+      {
+        "level": 3,
+        "name": "合理偏低",
+        "rangeLabel": "¥16–17.5",
+        "lowerBound": 16,
+        "upperBound": 17.5,
+        "action": "可以小仓观察或继续分批，不宜一次买满。"
+      },
+      {
+        "level": 4,
+        "name": "合理区",
+        "rangeLabel": "¥17.5–20.5",
+        "lowerBound": 17.5,
+        "upperBound": 20.5,
+        "action": "等待盈利和 ROE 继续确认，新增仓位要克制。"
+      },
+      {
+        "level": 5,
+        "name": "偏贵区",
+        "rangeLabel": "¥20.5 以上",
+        "lowerBound": 20.5,
+        "upperBound": null,
+        "action": "除非牛市成交放大、ROE 上台阶，否则不追。"
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "symbol": "603605",
+    "name": "珀莱雅",
+    "market": "上交所",
+    "industry": "美妆",
+    "currentPrice": 64.88,
+    "asOf": "2026-06-02",
+    "quality": "A",
+    "valuation": "合理偏低",
+    "thesis": "品牌资产和 ROE 仍然优秀，但主品牌增速放缓、费用压力增加，已经由高成长阶段转入调整期。低估值有吸引力，但要以业绩恢复作为上调估值的前提。",
+    "idealPrice": "¥55–58",
+    "valuationAnchor": "2026E PE 15–17×",
+    "keyRisk": "主品牌继续负增长、销售费用率压不下来，或花知晓并表后的协同效果低于预期。",
+    "bands": [
+      {
+        "level": 1,
+        "name": "深度低估",
+        "rangeLabel": "¥52 以下",
+        "lowerBound": null,
+        "upperBound": 52,
+        "action": "若非基本面恶化导致，是较好的左侧研究区。"
+      },
+      {
+        "level": 2,
+        "name": "舒适买入",
+        "rangeLabel": "¥52–58",
+        "lowerBound": 52,
+        "upperBound": 58,
+        "action": "靠近公司回购区间下沿，可考虑重点分批。"
+      },
+      {
+        "level": 3,
+        "name": "分批建仓",
+        "rangeLabel": "¥58–62",
+        "lowerBound": 58,
+        "upperBound": 62,
+        "action": "仍然偏便宜，适合循序建立仓位。"
+      },
+      {
+        "level": 4,
+        "name": "合理观察",
+        "rangeLabel": "¥62–70",
+        "lowerBound": 62,
+        "upperBound": 70,
+        "action": "安全边际一般，宜小仓观察业绩修复信号。"
+      },
+      {
+        "level": 5,
+        "name": "不宜追高",
+        "rangeLabel": "¥70 以上",
+        "lowerBound": 70,
+        "upperBound": null,
+        "action": "需要营收和利润重新增长来支撑更高估值。"
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "symbol": "601601",
+    "name": "中国太保",
+    "market": "上交所",
+    "industry": "保险",
+    "currentPrice": 31.07,
+    "asOf": "2026-06-08",
+    "quality": "A",
+    "valuation": "舒适分批",
+    "thesis": "大型综合保险龙头，寿险新业务价值和产险承保质量正在改善。当前 P/EV、PE 与 PB 都处于较低区间，更适合价值型分批低吸。",
+    "idealPrice": "¥30 以下",
+    "valuationAnchor": "P/EV 0.55–0.60×",
+    "keyRisk": "长端利率继续下行、权益市场走弱，或寿险新业务价值增速回落，会同时影响利润与估值中枢。",
+    "bands": [
+      {
+        "level": 1,
+        "name": "优先买入",
+        "rangeLabel": "¥30 以下",
+        "lowerBound": null,
+        "upperBound": 30,
+        "action": "P/EV 与股息率更有保护，可优先关注。"
+      },
+      {
+        "level": 2,
+        "name": "舒适分批",
+        "rangeLabel": "¥30–33",
+        "lowerBound": 30,
+        "upperBound": 33,
+        "action": "适合分批配置，但不建议一次买满。"
+      },
+      {
+        "level": 3,
+        "name": "合理偏低",
+        "rangeLabel": "¥33–37",
+        "lowerBound": 33,
+        "upperBound": 37,
+        "action": "仍不贵，赔率弱于 30 元附近，控制加仓节奏。"
+      },
+      {
+        "level": 4,
+        "name": "合理区",
+        "rangeLabel": "¥37–42",
+        "lowerBound": 37,
+        "upperBound": 42,
+        "action": "需要 NBV 与投资收益持续兑现。"
+      },
+      {
+        "level": 5,
+        "name": "偏贵区",
+        "rangeLabel": "¥42 以上",
+        "lowerBound": 42,
+        "upperBound": null,
+        "action": "需要更强基本面支撑；接近高位时不宜追涨。"
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "symbol": "002027",
+    "name": "分众传媒",
+    "market": "深交所",
+    "industry": "广告传媒",
+    "currentPrice": 5.39,
+    "asOf": "2026-06-08",
+    "quality": "A-",
+    "valuation": "合理偏低",
+    "thesis": "梯媒龙头拥有强点位网络、现金流与分红能力，可视为高股息现金流股叠加广告周期反转期权。TTM 利润受减值扰动，更应看正常化主业利润。",
+    "idealPrice": "¥4.5–5.2",
+    "valuationAnchor": "正常化 PE 14–18×",
+    "keyRisk": "广告主预算持续收缩、新潮传媒整合不及预期，或高分红因并购和扩张投入而下降。",
+    "bands": [
+      {
+        "level": 1,
+        "name": "深度低估",
+        "rangeLabel": "¥4.5 以下",
+        "lowerBound": null,
+        "upperBound": 4.5,
+        "action": "安全边际与股息率更舒服，可重点研究。"
+      },
+      {
+        "level": 2,
+        "name": "舒适买入",
+        "rangeLabel": "¥4.5–5.2",
+        "lowerBound": 4.5,
+        "upperBound": 5.2,
+        "action": "适合按计划分批，兼顾股息与修复赔率。"
+      },
+      {
+        "level": 3,
+        "name": "合理偏低",
+        "rangeLabel": "¥5.2–5.8",
+        "lowerBound": 5.2,
+        "upperBound": 5.8,
+        "action": "可小步买入，不要急于加满仓位。"
+      },
+      {
+        "level": 4,
+        "name": "基本合理",
+        "rangeLabel": "¥5.8–7",
+        "lowerBound": 5.8,
+        "upperBound": 7,
+        "action": "以持有为主，新增仓位性价比一般。"
+      },
+      {
+        "level": 5,
+        "name": "不宜追高",
+        "rangeLabel": "¥7 以上",
+        "lowerBound": 7,
+        "upperBound": null,
+        "action": "需要广告景气与并购协同明显超预期。"
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "symbol": "600690",
+    "name": "海尔智家",
+    "market": "上交所",
+    "industry": "白色家电",
+    "currentPrice": 20.07,
+    "asOf": "2026-06-09",
+    "quality": "A-",
+    "valuation": "舒适分批",
+    "thesis": "全球化白电龙头，现金流和分红质量较好，估值处在历史低位。2026Q1 的收入和利润下滑打断了稳定增长预期，因此当前便宜但有原因。",
+    "idealPrice": "¥18–20",
+    "valuationAnchor": "长期 PE 10–13×",
+    "keyRisk": "2026Q2/Q3 继续营收、利润双降，北美与关税扰动延续，或经营现金流和毛利率进一步承压。",
+    "bands": [
+      {
+        "level": 1,
+        "name": "深度低估",
+        "rangeLabel": "¥18 以下",
+        "lowerBound": null,
+        "upperBound": 18,
+        "action": "财报未继续恶化时，安全边际明显提升。"
+      },
+      {
+        "level": 2,
+        "name": "舒适买入",
+        "rangeLabel": "¥18–20.5",
+        "lowerBound": 18,
+        "upperBound": 20.5,
+        "action": "适合长期收息与估值修复逻辑下分批配置。"
+      },
+      {
+        "level": 3,
+        "name": "合理偏低",
+        "rangeLabel": "¥20.5–22.5",
+        "lowerBound": 20.5,
+        "upperBound": 22.5,
+        "action": "可以小仓位，但需要观察后续季度修复。"
+      },
+      {
+        "level": 4,
+        "name": "中性合理",
+        "rangeLabel": "¥22.5–25",
+        "lowerBound": 22.5,
+        "upperBound": 25,
+        "action": "买入性价比下降，等待业绩确认更稳妥。"
+      },
+      {
+        "level": 5,
+        "name": "偏贵区",
+        "rangeLabel": "¥25 以上",
+        "lowerBound": 25,
+        "upperBound": null,
+        "action": "不建议追；28 元以上尤其需要利润重新加速。"
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "symbol": "002049",
+    "name": "紫光国微",
+    "market": "深交所",
+    "industry": "半导体",
+    "currentPrice": 72.5,
+    "asOf": "2026-06",
+    "quality": "A-",
+    "valuation": "合理但不便宜",
+    "thesis": "特种集成电路与安全芯片具有真实收入、利润和研发壁垒，基本面处于修复期。但当前估值已计入较多增长预期，更适合等回调而非追高。",
+    "idealPrice": "¥60–68",
+    "valuationAnchor": "2026E PE 31–32×",
+    "keyRisk": "特种 IC 订单增速回落、经营现金流与回款继续偏弱，或瑞能半导并购整合效果低于预期。",
+    "bands": [
+      {
+        "level": 1,
+        "name": "吸引力增强",
+        "rangeLabel": "¥60 以下",
+        "lowerBound": null,
+        "upperBound": 60,
+        "action": "若基本面没有恶化，可进入重点研究区。"
+      },
+      {
+        "level": 2,
+        "name": "重点分批",
+        "rangeLabel": "¥60–68",
+        "lowerBound": 60,
+        "upperBound": 68,
+        "action": "估值与成长匹配度改善，可开始分批。"
+      },
+      {
+        "level": 3,
+        "name": "合理持有",
+        "rangeLabel": "¥68–75",
+        "lowerBound": 68,
+        "upperBound": 75,
+        "action": "合理但不便宜，更适合已有仓位持有。"
+      },
+      {
+        "level": 4,
+        "name": "偏贵观察",
+        "rangeLabel": "¥75–80",
+        "lowerBound": 75,
+        "upperBound": 80,
+        "action": "需要持续高增长兑现，新增仓位宜谨慎。"
+      },
+      {
+        "level": 5,
+        "name": "情绪定价",
+        "rangeLabel": "¥80 以上",
+        "lowerBound": 80,
+        "upperBound": null,
+        "action": "需要很强业绩支撑，否则不适合追高。"
+      }
+    ]
+  }
+]
