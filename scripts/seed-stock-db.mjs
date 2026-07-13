@@ -1,89 +1,20 @@
 import { DatabaseSync } from "node:sqlite";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const sourcePath = resolve(root, "data/stocks.source.json");
 const databasePath = resolve(root, "data/stocks.db");
 const snapshotPath = resolve(root, "app/data/stocks.generated.json");
 
 mkdirSync(dirname(databasePath), { recursive: true });
 mkdirSync(dirname(snapshotPath), { recursive: true });
 
-const stocks = [
-  {
-    symbol: "600999", name: "招商证券", market: "上交所", industry: "证券", currentPrice: 17.30, asOf: "2026-06", quality: "A-", valuation: "合理偏低", idealPrice: "¥15–16", valuationAnchor: "PE 11–12× / PB 1.1–1.25×",
-    thesis: "头部综合券商，财富管理和机构业务较强。PE 偏低、股息率有吸引力，但券商利润受市场成交和自营收益影响明显，PB 尚未到极端便宜。",
-    keyRisk: "市场成交额回落、自营收益下降，或 ROE 无法稳定在 10% 附近，会削弱当前估值逻辑。",
-    bands: [
-      ["深度低估", "¥14.5 以下", null, 14.5, "基本面未恶化时，可重点研究并建立安全边际仓位。"],
-      ["舒适买入", "¥14.5–16", 14.5, 16, "适合按计划分批，股息率也更有吸引力。"],
-      ["合理偏低", "¥16–17.5", 16, 17.5, "可以小仓观察或继续分批，不宜一次买满。"],
-      ["合理区", "¥17.5–20.5", 17.5, 20.5, "等待盈利和 ROE 继续确认，新增仓位要克制。"],
-      ["偏贵区", "¥20.5 以上", 20.5, null, "除非牛市成交放大、ROE 上台阶，否则不追。"],
-    ],
-  },
-  {
-    symbol: "603605", name: "珀莱雅", market: "上交所", industry: "美妆", currentPrice: 64.88, asOf: "2026-06-02", quality: "A", valuation: "合理偏低", idealPrice: "¥55–58", valuationAnchor: "2026E PE 15–17×",
-    thesis: "品牌资产和 ROE 仍然优秀，但主品牌增速放缓、费用压力增加，已经由高成长阶段转入调整期。低估值有吸引力，但要以业绩恢复作为上调估值的前提。",
-    keyRisk: "主品牌继续负增长、销售费用率压不下来，或花知晓并表后的协同效果低于预期。",
-    bands: [
-      ["深度低估", "¥52 以下", null, 52, "若非基本面恶化导致，是较好的左侧研究区。"],
-      ["舒适买入", "¥52–58", 52, 58, "靠近公司回购区间下沿，可考虑重点分批。"],
-      ["分批建仓", "¥58–62", 58, 62, "仍然偏便宜，适合循序建立仓位。"],
-      ["合理观察", "¥62–70", 62, 70, "安全边际一般，宜小仓观察业绩修复信号。"],
-      ["不宜追高", "¥70 以上", 70, null, "需要营收和利润重新增长来支撑更高估值。"],
-    ],
-  },
-  {
-    symbol: "601601", name: "中国太保", market: "上交所", industry: "保险", currentPrice: 31.07, asOf: "2026-06-08", quality: "A", valuation: "舒适分批", idealPrice: "¥30 以下", valuationAnchor: "P/EV 0.55–0.60×",
-    thesis: "大型综合保险龙头，寿险新业务价值和产险承保质量正在改善。当前 P/EV、PE 与 PB 都处于较低区间，更适合价值型分批低吸。",
-    keyRisk: "长端利率继续下行、权益市场走弱，或寿险新业务价值增速回落，会同时影响利润与估值中枢。",
-    bands: [
-      ["优先买入", "¥30 以下", null, 30, "P/EV 与股息率更有保护，可优先关注。"],
-      ["舒适分批", "¥30–33", 30, 33, "适合分批配置，但不建议一次买满。"],
-      ["合理偏低", "¥33–37", 33, 37, "仍不贵，赔率弱于 30 元附近，控制加仓节奏。"],
-      ["合理区", "¥37–42", 37, 42, "需要 NBV 与投资收益持续兑现。"],
-      ["偏贵区", "¥42 以上", 42, null, "需要更强基本面支撑；接近高位时不宜追涨。"],
-    ],
-  },
-  {
-    symbol: "002027", name: "分众传媒", market: "深交所", industry: "广告传媒", currentPrice: 5.39, asOf: "2026-06-08", quality: "A-", valuation: "合理偏低", idealPrice: "¥4.5–5.2", valuationAnchor: "正常化 PE 14–18×",
-    thesis: "梯媒龙头拥有强点位网络、现金流与分红能力，可视为高股息现金流股叠加广告周期反转期权。TTM 利润受减值扰动，更应看正常化主业利润。",
-    keyRisk: "广告主预算持续收缩、新潮传媒整合不及预期，或高分红因并购和扩张投入而下降。",
-    bands: [
-      ["深度低估", "¥4.5 以下", null, 4.5, "安全边际与股息率更舒服，可重点研究。"],
-      ["舒适买入", "¥4.5–5.2", 4.5, 5.2, "适合按计划分批，兼顾股息与修复赔率。"],
-      ["合理偏低", "¥5.2–5.8", 5.2, 5.8, "可小步买入，不要急于加满仓位。"],
-      ["基本合理", "¥5.8–7", 5.8, 7, "以持有为主，新增仓位性价比一般。"],
-      ["不宜追高", "¥7 以上", 7, null, "需要广告景气与并购协同明显超预期。"],
-    ],
-  },
-  {
-    symbol: "600690", name: "海尔智家", market: "上交所", industry: "白色家电", currentPrice: 20.07, asOf: "2026-06-09", quality: "A-", valuation: "舒适分批", idealPrice: "¥18–20", valuationAnchor: "长期 PE 10–13×",
-    thesis: "全球化白电龙头，现金流和分红质量较好，估值处在历史低位。2026Q1 的收入和利润下滑打断了稳定增长预期，因此当前便宜但有原因。",
-    keyRisk: "2026Q2/Q3 继续营收、利润双降，北美与关税扰动延续，或经营现金流和毛利率进一步承压。",
-    bands: [
-      ["深度低估", "¥18 以下", null, 18, "财报未继续恶化时，安全边际明显提升。"],
-      ["舒适买入", "¥18–20.5", 18, 20.5, "适合长期收息与估值修复逻辑下分批配置。"],
-      ["合理偏低", "¥20.5–22.5", 20.5, 22.5, "可以小仓位，但需要观察后续季度修复。"],
-      ["中性合理", "¥22.5–25", 22.5, 25, "买入性价比下降，等待业绩确认更稳妥。"],
-      ["偏贵区", "¥25 以上", 25, null, "不建议追；28 元以上尤其需要利润重新加速。"],
-    ],
-  },
-  {
-    symbol: "002049", name: "紫光国微", market: "深交所", industry: "半导体", currentPrice: 72.50, asOf: "2026-06", quality: "A-", valuation: "合理但不便宜", idealPrice: "¥60–68", valuationAnchor: "2026E PE 31–32×",
-    thesis: "特种集成电路与安全芯片具有真实收入、利润和研发壁垒，基本面处于修复期。但当前估值已计入较多增长预期，更适合等回调而非追高。",
-    keyRisk: "特种 IC 订单增速回落、经营现金流与回款继续偏弱，或瑞能半导并购整合效果低于预期。",
-    bands: [
-      ["吸引力增强", "¥60 以下", null, 60, "若基本面没有恶化，可进入重点研究区。"],
-      ["重点分批", "¥60–68", 60, 68, "估值与成长匹配度改善，可开始分批。"],
-      ["合理持有", "¥68–75", 68, 75, "合理但不便宜，更适合已有仓位持有。"],
-      ["偏贵观察", "¥75–80", 75, 80, "需要持续高增长兑现，新增仓位宜谨慎。"],
-      ["情绪定价", "¥80 以上", 80, null, "需要很强业绩支撑，否则不适合追高。"],
-    ],
-  },
-];
+const stocks = JSON.parse(readFileSync(sourcePath, "utf8"));
+if (!Array.isArray(stocks) || stocks.length === 0) {
+  throw new Error(`No stocks found in ${sourcePath}`);
+}
 
 const db = new DatabaseSync(databasePath);
 db.exec("PRAGMA foreign_keys = ON");
@@ -135,9 +66,18 @@ try {
   db.exec("DELETE FROM sqlite_sequence WHERE name IN ('valuation_bands', 'stocks')");
   for (const stock of stocks) {
     const result = insertStock.run(
-      stock.symbol, stock.name, stock.market, stock.industry, stock.currentPrice,
-      stock.asOf, stock.quality, stock.valuation, stock.thesis, stock.idealPrice,
-      stock.valuationAnchor, stock.keyRisk,
+      stock.symbol,
+      stock.name,
+      stock.market,
+      stock.industry,
+      stock.currentPrice,
+      stock.asOf,
+      stock.quality,
+      stock.valuation,
+      stock.thesis,
+      stock.idealPrice,
+      stock.valuationAnchor,
+      stock.keyRisk,
     );
     stock.bands.forEach((band, index) => {
       insertBand.run(result.lastInsertRowid, index + 1, ...band);
@@ -149,7 +89,9 @@ try {
   throw error;
 }
 
-const rows = db.prepare(`
+const rows = db
+  .prepare(
+    `
   SELECT
     s.id, s.symbol, s.name, s.market, s.industry,
     s.current_price AS currentPrice, s.as_of AS asOf, s.quality, s.valuation,
@@ -160,24 +102,39 @@ const rows = db.prepare(`
   FROM stocks s
   JOIN valuation_bands b ON b.stock_id = s.id
   ORDER BY s.id, b.level
-`).all();
+`,
+  )
+  .all();
 
 const snapshot = [];
 for (const row of rows) {
   let stock = snapshot.at(-1);
   if (!stock || stock.id !== row.id) {
     stock = {
-      id: row.id, symbol: row.symbol, name: row.name, market: row.market,
-      industry: row.industry, currentPrice: row.currentPrice, asOf: row.asOf,
-      quality: row.quality, valuation: row.valuation, thesis: row.thesis,
-      idealPrice: row.idealPrice, valuationAnchor: row.valuationAnchor,
-      keyRisk: row.keyRisk, bands: [],
+      id: row.id,
+      symbol: row.symbol,
+      name: row.name,
+      market: row.market,
+      industry: row.industry,
+      currentPrice: row.currentPrice,
+      asOf: row.asOf,
+      quality: row.quality,
+      valuation: row.valuation,
+      thesis: row.thesis,
+      idealPrice: row.idealPrice,
+      valuationAnchor: row.valuationAnchor,
+      keyRisk: row.keyRisk,
+      bands: [],
     };
     snapshot.push(stock);
   }
   stock.bands.push({
-    level: row.level, name: row.bandName, rangeLabel: row.rangeLabel,
-    lowerBound: row.lowerBound, upperBound: row.upperBound, action: row.action,
+    level: row.level,
+    name: row.bandName,
+    rangeLabel: row.rangeLabel,
+    lowerBound: row.lowerBound,
+    upperBound: row.upperBound,
+    action: row.action,
   });
 }
 
