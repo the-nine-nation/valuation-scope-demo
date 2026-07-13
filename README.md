@@ -7,3 +7,28 @@
 ```bash
 npm run dev
 ```
+
+## 线上地址
+
+https://valuation-scope-demo.valuation-scope.workers.dev
+
+## 常用命令
+
+```bash
+npm run prices:update   # 拉取 A 股现价并重写快照
+npm run deploy          # 构建并部署到 Cloudflare Workers
+npm run db:seed         # 仅从 data/stocks.source.json 重建快照
+```
+
+## 日更自动化
+
+GitHub Actions 工作流：`.github/workflows/daily-prices.yml`
+
+- 每个工作日北京时间约 16:10 自动更新现价
+- 有变更则提交 `data/stocks.source.json` 与 `app/data/stocks.generated.json`
+- 若配置了 Secrets，则继续部署到 Cloudflare
+
+需要在仓库 Settings → Secrets 中配置：
+
+- `CLOUDFLARE_API_TOKEN`：Edit Cloudflare Workers 权限
+- `CLOUDFLARE_ACCOUNT_ID`：`7b38ee994385e861ee8e0e7feb58e9b0`
