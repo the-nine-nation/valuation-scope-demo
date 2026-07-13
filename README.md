@@ -30,5 +30,10 @@ GitHub Actions 工作流：`.github/workflows/daily-prices.yml`
 
 需要在仓库 Settings → Secrets 中配置：
 
-- `CLOUDFLARE_API_TOKEN`：Edit Cloudflare Workers 权限
+- `CLOUDFLARE_API_TOKEN`：用模板 **Edit Cloudflare Workers** 创建  
+  - **不要**开启 Client IP Address Filtering（GitHub Actions 在海外 IP，会报 9109）  
+  - Account 选你的 Cloudflare 账号
 - `CLOUDFLARE_ACCOUNT_ID`：`7b38ee994385e861ee8e0e7feb58e9b0`
+
+日更提交与部署是两个独立 job：即使自动部署失败，现价仍会写回仓库。  
+本地部署始终可用：`npm run deploy`（依赖本机 `wrangler login`）。
