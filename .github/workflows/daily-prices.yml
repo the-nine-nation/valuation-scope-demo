@@ -2,6 +2,10 @@ name: Daily prices and deploy
 
 on:
   schedule:
+    # Trading-day style cadence (UTC): ~ every 30m during CN equity hours.
+    # Shanghai 09:00–15:30 ≈ UTC 01:00–07:30.
+    - cron: "0,30 1-7 * * 1-5"
+    # Off-hours snapshot once more for close / evening readers
     - cron: "10 8 * * 1-5"
   workflow_dispatch:
   push:
@@ -44,7 +48,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No price changes to commit."
           else
-            git commit -m "chore: update A-share prices $(date -u +%Y-%m-%d)"
+            git commit -m "chore: update A-share prices $(date -u +%Y-%m-%dT%H:%MZ)"
             git push
           fi
 

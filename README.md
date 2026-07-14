@@ -56,12 +56,18 @@ npm test
 
 规则：自动化只更新价格；分析与名单只改 source；部署前必须 seed。
 
-## 日更与部署
+## 价格双轨与部署
+
+| 层 | 作用 | 刷新 |
+|---|---|---|
+| **展示实时** | 公网页 `/api/quotes`、管理页 `/api/quotes` 直连腾讯行情 | 打开页面后约 30s 轮询 |
+| **Git 快照** | `data/prices.snapshot.json`（seed 兜底 / 离线） | CI 交易时段约每 30 分钟 |
 
 工作流：`.github/workflows/daily-prices.yml`
 
-1. 工作日定时 → 更新 `data/prices.snapshot.json` → commit  
-2. push `main` → seed → deploy `apps/web`  
+1. 工作日交易时段 cron（约每 30 分钟，UTC）→ 更新 `prices.snapshot.json` → commit  
+2. push `main` 或价格任务成功后 → seed → deploy `apps/web`  
+3. 线上页面现价以 Worker 实时接口为主，快照仅作兜底  
 
 Secrets：`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`。
 
