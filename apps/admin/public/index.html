@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>估值刻度 · 本地管理</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f1ea;
+        --card: #fffdf8;
+        --ink: #1c1917;
+        --muted: #78716c;
+        --line: #e7e0d5;
+        --accent: #0f766e;
+        --danger: #b91c1c;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "SF Pro Text", "PingFang SC", system-ui, sans-serif;
+        background: radial-gradient(circle at top left, #fff7ed, var(--bg));
+        color: var(--ink);
+        min-height: 100vh;
+      }
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 32px 20px 64px;
+      }
+      h1 { font-size: 1.6rem; margin: 0 0 0.25rem; }
+      .sub { color: var(--muted); margin-bottom: 1.5rem; }
+      .grid { display: grid; gap: 16px; }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 16px 18px;
+        box-shadow: 0 8px 24px rgba(28, 25, 23, 0.04);
+      }
+      label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; }
+      input, select, button, textarea { font: inherit; }
+      input, select {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: white;
+      }
+      .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 10px 16px;
+        background: var(--accent);
+        color: white;
+        cursor: pointer;
+      }
+      button.secondary { background: #44403c; }
+      button.danger { background: var(--danger); }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+      .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+      pre {
+        white-space: pre-wrap;
+        background: #1c1917;
+        color: #fafaf9;
+        border-radius: 12px;
+        padding: 12px;
+        min-height: 80px;
+        font-size: 0.8rem;
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #ecfdf5;
+        color: #065f46;
+        font-size: 0.75rem;
+      }
+      .hint { font-size: 0.8rem; color: var(--muted); margin: 8px 0 0; line-height: 1.45; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; word-break: break-all; }
+      .ok { color: #065f46; }
+      .bad { color: var(--danger); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>估值刻度 · 本地管理</h1>
+      <p class="sub">仅监听 127.0.0.1 · 读写共享 <code>data/</code> · 不会部署到 Cloudflare</p>
+
+      <div class="grid">
+        <section class="card">
+          <h2>Codex 分析设置</h2>
+          <div class="row">
+            <div>
+              <label for="analysisModel">分析模型（实时从 Codex 拉取）</label>
+              <select id="analysisModel"></select>
+            </div>
+            <div>
+              <label for="codexBinaryMode">Codex 可执行文件</label>
+              <select id="codexBinaryMode">
+                <option value="auto">自动探测</option>
+                <option value="custom">手动指定路径</option>
+              </select>
+            </div>
+            <div id="customBinaryWrap" style="display:none">
+              <label for="codexBinary">自定义路径</label>
+              <input id="codexBinary" placeholder="/path/to/codex" />
+            </div>
+          </div>
+          <p class="hint">
+            Sandbox 固定为 <code>workspace-write</code>（分析要改 <code>data/stocks.source.json</code>，read-only 不够）。
+          </p>
+          <p class="hint mono" id="binaryInfo">探测中…</p>
+          <p class="hint" id="modelsInfo"></p>
+          <p style="margin: 12px 0">
+            <button id="saveSettings" type="button">保存设置</button>
+            <button id="refreshCodex" class="secondary" type="button">刷新模型列表</button>
+            <button id="seedNow" class="secondary" type="button">重新 seed</button>
+          </p>
+        </section>
+
+        <section class="card">
+          <h2>新增股票</h2>
+          <div class="row">
+            <div>
+              <label for="symbol">代码</label>
+              <input id="symbol" placeholder="600519" />
+            </div>
+            <div>
+              <label for="name">名称</label>
+              <input id="name" placeholder="贵州茅台" />
+            </div>
+            <div>
+              <label for="industry">行业</label>
+              <input id="industry" placeholder="白酒" />
+            </div>
+            <div>
+              <label for="quality">质量</label>
+              <input id="quality" placeholder="A-" />
+            </div>
+          </div>
+          <p style="margin: 12px 0">
+            <button id="addStock" type="button">新增到 source</button>
+          </p>
+        </section>
+
+        <section class="card">
+          <h2>观察池 <span id="count" class="badge">0</span></h2>
+          <table>
+            <thead>
+              <tr>
+                <th>代码</th>
+                <th>名称</th>
+                <th>现价</th>
+                <th>质量</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </section>
+
+        <section class="card">
+          <h2>日志</h2>
+          <pre id="log">就绪。</pre>
+        </section>
+      </div>
+    </main>
+    <script>
+      const logEl = document.getElementById("log");
+      let codexState = null;
+
+      function log(msg) {
+        logEl.textContent = typeof msg === "string" ? msg : JSON.stringify(msg, null, 2);
+      }
+
+      async function api(path, options) {
+        const res = await fetch(path, {
+          headers: { "content-type": "application/json" },
+          ...options,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || res.statusText);
+        return data;
+      }
+
+      function fillModelSelect(models, selected) {
+        const sel = document.getElementById("analysisModel");
+        const prev = selected || sel.value;
+        sel.innerHTML = "";
+        if (!models.length) {
+          const opt = document.createElement("option");
+          opt.value = "";
+          opt.textContent = "（未获取到模型）";
+          sel.append(opt);
+          return;
+        }
+        for (const m of models) {
+          const opt = document.createElement("option");
+          opt.value = m.slug;
+          opt.textContent = m.displayName
+            ? `${m.displayName} (${m.slug})`
+            : m.slug;
+          sel.append(opt);
+        }
+        if (prev && [...sel.options].some((o) => o.value === prev)) {
+          sel.value = prev;
+        }
+      }
+
+      function renderCodexInfo(s) {
+        codexState = s;
+        const binaryInfo = document.getElementById("binaryInfo");
+        const modelsInfo = document.getElementById("modelsInfo");
+        if (s.binaryOk && s.resolvedBinary) {
+          binaryInfo.innerHTML =
+            `<span class="ok">已找到 Codex</span> · 来源 ${s.binarySource || "?"} · ` +
+            `<span class="mono">${s.resolvedBinary}</span>` +
+            (s.version ? ` · ${s.version}` : "");
+        } else {
+          binaryInfo.innerHTML =
+            `<span class="bad">未找到 Codex CLI</span> · 请安装 ChatGPT/Codex 应用，或把 codex 放进 PATH，或选「手动指定路径」`;
+        }
+        modelsInfo.textContent = s.models?.length
+          ? `模型列表来源：${s.modelsSource || "?"} · 共 ${s.models.length} 个（已过滤 hide）` +
+            (s.configDefaultModel ? ` · 本机默认 ${s.configDefaultModel}` : "")
+          : `模型列表为空${s.modelsError ? " · " + s.modelsError : ""}`;
+
+        const mode = document.getElementById("codexBinaryMode");
+        const custom = document.getElementById("codexBinary");
+        const wrap = document.getElementById("customBinaryWrap");
+        const saved = s.codexBinary || "auto";
+        if (saved === "auto" || saved === "codex" || !saved) {
+          mode.value = "auto";
+          wrap.style.display = "none";
+        } else {
+          mode.value = "custom";
+          wrap.style.display = "";
+          custom.value = saved;
+        }
+        fillModelSelect(s.models || [], s.analysisModel || s.effectiveModel || s.configDefaultModel);
+      }
+
+      async function loadSettings() {
+        const s = await api("/api/settings");
+        renderCodexInfo(s);
+      }
+
+      async function refreshCodex() {
+        const s = await api("/api/codex");
+        renderCodexInfo({
+          ...s.settings,
+          resolvedBinary: s.binary?.path,
+          binarySource: s.binary?.source,
+          binaryOk: s.binary?.ok,
+          version: s.version,
+          models: s.models,
+          modelsSource: s.modelsSource,
+          modelsError: s.modelsError,
+          configDefaultModel: s.configDefaultModel,
+          effectiveModel: s.effectiveModel,
+          analysisModel: s.settings?.analysisModel,
+          codexBinary: s.settings?.codexBinary,
+        });
+        log({ refreshed: true, models: s.models?.map((m) => m.slug), binary: s.binary });
+      }
+
+      async function loadStocks() {
+        const data = await api("/api/stocks");
+        document.getElementById("count").textContent = String(data.stocks.length);
+        const tbody = document.getElementById("rows");
+        tbody.innerHTML = "";
+        for (const stock of data.stocks) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${stock.symbol}</td>
+            <td>${stock.name}<div style="color:#78716c;font-size:12px">${stock.industry || ""}</div></td>
+            <td>${stock.currentPrice != null ? "¥" + stock.currentPrice : "—"}<div style="color:#78716c;font-size:12px">${stock.asOf || ""}</div></td>
+            <td>${stock.quality || ""}</td>
+            <td class="actions"></td>
+          `;
+          const actions = tr.querySelector(".actions");
+          const analyzeBtn = document.createElement("button");
+          analyzeBtn.textContent = "重新分析";
+          analyzeBtn.type = "button";
+          analyzeBtn.onclick = async () => {
+            analyzeBtn.disabled = true;
+            log(`正在用 Codex 分析 ${stock.symbol} ...`);
+            try {
+              const result = await api(`/api/analyze/${stock.symbol}`, { method: "POST" });
+              log(result);
+              await loadStocks();
+            } catch (e) {
+              log(String(e.message || e));
+            } finally {
+              analyzeBtn.disabled = false;
+            }
+          };
+          const delBtn = document.createElement("button");
+          delBtn.textContent = "删除";
+          delBtn.type = "button";
+          delBtn.className = "danger";
+          delBtn.onclick = async () => {
+            if (!confirm(`删除 ${stock.symbol} ${stock.name}？`)) return;
+            await api(`/api/stocks/${stock.symbol}`, { method: "DELETE" });
+            await loadStocks();
+            log(`已删除 ${stock.symbol}`);
+          };
+          actions.append(analyzeBtn, delBtn);
+          tbody.append(tr);
+        }
+      }
+
+      document.getElementById("codexBinaryMode").onchange = () => {
+        const mode = document.getElementById("codexBinaryMode").value;
+        document.getElementById("customBinaryWrap").style.display =
+          mode === "custom" ? "" : "none";
+      };
+
+      document.getElementById("saveSettings").onclick = async () => {
+        const mode = document.getElementById("codexBinaryMode").value;
+        const body = {
+          analysisModel: document.getElementById("analysisModel").value.trim(),
+          codexBinary:
+            mode === "auto"
+              ? "auto"
+              : document.getElementById("codexBinary").value.trim() || "auto",
+          sandbox: "workspace-write",
+        };
+        const saved = await api("/api/settings", {
+          method: "PUT",
+          body: JSON.stringify(body),
+        });
+        renderCodexInfo(saved);
+        log({ saved: true, effectiveModel: saved.effectiveModel, binary: saved.resolvedBinary });
+      };
+
+      document.getElementById("refreshCodex").onclick = () =>
+        refreshCodex().catch((e) => log(String(e.message || e)));
+
+      document.getElementById("seedNow").onclick = async () => {
+        const result = await api("/api/seed", { method: "POST" });
+        log(result);
+      };
+
+      document.getElementById("addStock").onclick = async () => {
+        const body = {
+          symbol: document.getElementById("symbol").value.trim(),
+          name: document.getElementById("name").value.trim(),
+          industry: document.getElementById("industry").value.trim(),
+          quality: document.getElementById("quality").value.trim(),
+        };
+        const result = await api("/api/stocks", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        log(result);
+        document.getElementById("symbol").value = "";
+        await loadStocks();
+      };
+
+      Promise.all([loadSettings(), loadStocks()]).catch((e) =>
+        log(String(e.message || e)),
+      );
+    </script>
+  </body>
+</html>
