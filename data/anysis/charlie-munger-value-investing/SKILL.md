@@ -168,7 +168,14 @@ data/anysis/runs/<symbol>.json
 - `bands` **正好 5 档**；`lower`/`upper` 为 number 或 `null`；相邻区间合理。  
 - `analysis.business` / `financials` / `valuation` 各 ≥ 20 字（详情页展示用）。  
 - `analysis.scenarios` ≥ 3 条。  
-- 全文中文。
+- 全文中文。  
+- **审计字段（ingest 硬校验，缺一不可）**  
+  - `analysis.skillVersion`：固定 `charlie-munger-value-investing@1`  
+  - `analysis.stepsCompleted`：必须包含全部  
+    `0-scope-circle` … `10-principles-selfcheck`（见 `tools/scripts/analysis-schema.mjs` 的 `REQUIRED_SKILL_STEPS`）  
+  - `analysis.sources`：≥ 2 条；每条 `{ title, url?, asOf?, kind? }`  
+    - `kind` 建议：`filing` | `quote` | `peer` | `news` | `other`  
+  - 研究可用内置 web_search / 只读拉公开财报；用户 MCP 在管理页 headless 中关闭  
 
 ### 3. 确定性入库（脚本负责，不要跳过）
 

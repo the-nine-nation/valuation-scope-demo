@@ -56,6 +56,18 @@ function normalizeAnalysis(stock) {
       : [],
     vetoTriggers: Array.isArray(a.vetoTriggers) ? a.vetoTriggers.map(String) : [],
     reportMarkdown: String(a.reportMarkdown ?? "").trim() || null,
+    skillVersion: a.skillVersion ? String(a.skillVersion) : null,
+    stepsCompleted: Array.isArray(a.stepsCompleted)
+      ? a.stepsCompleted.map(String)
+      : [],
+    sources: Array.isArray(a.sources)
+      ? a.sources.map((s) => ({
+          title: String(s.title ?? "").trim(),
+          url: s.url ? String(s.url) : null,
+          asOf: s.asOf ? String(s.asOf) : null,
+          kind: s.kind ? String(s.kind) : null,
+        }))
+      : [],
     analyzedAt: a.analyzedAt ? String(a.analyzedAt) : null,
     model: a.model ? String(a.model) : null,
   };

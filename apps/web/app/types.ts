@@ -13,6 +13,13 @@ export type AnalysisScenario = {
   fairValue: string;
 };
 
+export type AnalysisSource = {
+  title: string;
+  url: string | null;
+  asOf: string | null;
+  kind: string | null;
+};
+
 export type StockAnalysis = {
   summary: string;
   stage: string | null;
@@ -26,6 +33,10 @@ export type StockAnalysis = {
   raiseBuyPriceWhen: string[];
   vetoTriggers: string[];
   reportMarkdown: string | null;
+  /** e.g. charlie-munger-value-investing@1 */
+  skillVersion: string | null;
+  stepsCompleted: string[];
+  sources: AnalysisSource[];
   analyzedAt: string | null;
   model: string | null;
 };

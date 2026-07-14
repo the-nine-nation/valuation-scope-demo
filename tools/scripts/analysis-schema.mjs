@@ -16,6 +16,30 @@ export const ANALYSIS_FIELD_KEYS = [
   "raiseBuyPriceWhen",
   "vetoTriggers",
   "reportMarkdown",
+  "skillVersion",
+  "stepsCompleted",
+  "sources",
+];
+
+/** Must match data/anysis/charlie-munger-value-investing skill contract */
+export const REQUIRED_SKILL_VERSION = "charlie-munger-value-investing@1";
+
+/**
+ * Skill workflow steps (SKILL.md 执行流程 0–10).
+ * Codex must claim completion for each id in analysis.stepsCompleted.
+ */
+export const REQUIRED_SKILL_STEPS = [
+  "0-scope-circle",
+  "1-data-collect",
+  "2-valuation-framework",
+  "3-quality-stage",
+  "4-financial-statements",
+  "5-history-peers",
+  "6-three-scenarios",
+  "7-layered-buy-zones",
+  "8-raise-and-veto",
+  "9-chinese-report",
+  "10-principles-selfcheck",
 ];
 
 const BAND_NAMES_HINT = ["深度低估/优先", "舒适", "合理偏低/分批", "合理", "偏贵/不宜"];
@@ -26,6 +50,92 @@ function isNonEmptyString(value) {
 
 function isNullOrNumber(value) {
   return value === null || (typeof value === "number" && Number.isFinite(value));
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function validateSkillVersion(value) {
+  const v = String(value ?? "").trim();
+  if (!v) {
+    throw new Error(
+      `analysis.skillVersion required (expected ${REQUIRED_SKILL_VERSION})`,
+    );
+  }
+  if (v !== REQUIRED_SKILL_VERSION) {
+    throw new Error(
+      `analysis.skillVersion must be "${REQUIRED_SKILL_VERSION}" (got "${v}")`,
+    );
+  }
+  return v;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+export function validateStepsCompleted(value) {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error(
+      `analysis.stepsCompleted must be non-empty array covering: ${REQUIRED_SKILL_STEPS.join(", ")}`,
+    );
+  }
+  const steps = value.map((item, index) => {
+    if (!isNonEmptyString(item)) {
+      throw new Error(`analysis.stepsCompleted[${index}] must be non-empty string`);
+    }
+    return item.trim();
+  });
+  const set = new Set(steps);
+  const missing = REQUIRED_SKILL_STEPS.filter((id) => !set.has(id));
+  if (missing.length) {
+    throw new Error(
+      `analysis.stepsCompleted missing required steps: ${missing.join(", ")}`,
+    );
+  }
+  // Keep required order first, then any extra steps Codex added
+  const extras = steps.filter((id) => !REQUIRED_SKILL_STEPS.includes(id));
+  return [...REQUIRED_SKILL_STEPS, ...extras];
+}
+
+/**
+ * @param {unknown} value
+ * @returns {{ title: string, url?: string|null, asOf?: string|null, kind?: string|null }[]}
+ */
+export function validateSources(value) {
+  if (!Array.isArray(value) || value.length < 2) {
+    throw new Error(
+      "analysis.sources must be an array of ≥2 items (title required; url/asOf/kind optional)",
+    );
+  }
+  return value.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new Error(`analysis.sources[${index}] must be object`);
+    }
+    const title = String(item.title ?? "").trim();
+    if (!title) {
+      throw new Error(`analysis.sources[${index}].title required`);
+    }
+    const urlRaw = item.url == null || item.url === "" ? null : String(item.url).trim();
+    if (urlRaw && !/^https?:\/\//i.test(urlRaw)) {
+      throw new Error(`analysis.sources[${index}].url must be http(s) or null`);
+    }
+    const asOf =
+      item.asOf == null || item.asOf === ""
+        ? null
+        : String(item.asOf).trim();
+    const kind =
+      item.kind == null || item.kind === ""
+        ? null
+        : String(item.kind).trim();
+    return {
+      title,
+      url: urlRaw,
+      asOf,
+      kind,
+    };
+  });
 }
 
 /**
@@ -122,6 +232,15 @@ export function normalizeAnalysisPayload(raw, expectedSymbol) {
   const bands = validateBands(raw.bands);
 
   const analysisIn = raw.analysis && typeof raw.analysis === "object" ? raw.analysis : {};
+  // Prefer nested analysis.* audit fields; allow top-level aliases for convenience
+  const skillVersion = validateSkillVersion(
+    analysisIn.skillVersion ?? raw.skillVersion,
+  );
+  const stepsCompleted = validateStepsCompleted(
+    analysisIn.stepsCompleted ?? raw.stepsCompleted,
+  );
+  const sources = validateSources(analysisIn.sources ?? raw.sources);
+
   const analysis = {
     summary: String(analysisIn.summary ?? thesis).trim(),
     stage: String(analysisIn.stage ?? "待判定").trim(),
@@ -145,6 +264,9 @@ export function normalizeAnalysisPayload(raw, expectedSymbol) {
       ? validateStringList(analysisIn.vetoTriggers, "analysis.vetoTriggers")
       : [keyRisk],
     reportMarkdown: String(analysisIn.reportMarkdown ?? "").trim(),
+    skillVersion,
+    stepsCompleted,
+    sources,
     analyzedAt:
       String(analysisIn.analyzedAt ?? raw.analyzedAt ?? "").trim() ||
       new Intl.DateTimeFormat("en-CA", {
@@ -219,6 +341,12 @@ export const ANALYSIS_RUN_CONTRACT = `{
     "raiseBuyPriceWhen": ["条件1", "条件2"],
     "vetoTriggers": ["触发1", "触发2"],
     "reportMarkdown": "可选：完整中文报告 Markdown",
+    "skillVersion": "${REQUIRED_SKILL_VERSION}",
+    "stepsCompleted": ${JSON.stringify(REQUIRED_SKILL_STEPS)},
+    "sources": [
+      { "title": "公司最新年报/中报", "url": "https://...", "asOf": "YYYY-MM-DD", "kind": "filing" },
+      { "title": "行情/估值来源", "url": "https://...", "asOf": "YYYY-MM-DD", "kind": "quote" }
+    ],
     "analyzedAt": "YYYY-MM-DD",
     "model": "模型 slug（可选）"
   }
