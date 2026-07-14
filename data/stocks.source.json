@@ -782,5 +782,89 @@
       "analyzedAt": null,
       "model": null
     }
+  },
+  {
+    "symbol": "000001",
+    "name": "平安银行",
+    "market": "深交所",
+    "industry": "银行",
+    "quality": "B",
+    "idealPrice": "待校准",
+    "valuationAnchor": "待校准",
+    "thesis": "【草稿】已录入代码与名称，待按 charlie-munger-value-investing skill 完成分析后填写。",
+    "keyRisk": "【草稿】待分析后填写。",
+    "bands": [
+      [
+        "深度低估",
+        "¥7.97 以下",
+        null,
+        7.97,
+        "【草稿】占位区间，待价值投资分析后校准。"
+      ],
+      [
+        "舒适买入",
+        "¥7.97–9.04",
+        7.97,
+        9.04,
+        "【草稿】占位区间，待价值投资分析后校准。"
+      ],
+      [
+        "合理偏低",
+        "¥9.04–10.1",
+        9.04,
+        10.1,
+        "【草稿】占位区间，待价值投资分析后校准。"
+      ],
+      [
+        "合理区",
+        "¥10.1–11.69",
+        10.1,
+        11.69,
+        "【草稿】占位区间，待价值投资分析后校准。"
+      ],
+      [
+        "偏贵区",
+        "¥11.69 以上",
+        11.69,
+        null,
+        "【草稿】占位区间，待价值投资分析后校准。"
+      ]
+    ],
+    "analysis": {
+      "summary": "【草稿】待价值投资分析后填写一句话结论。",
+      "stage": "待判定",
+      "circleOfCompetence": "部分理解",
+      "priceVerdict": "需要观察",
+      "business": "【草稿】待分析业务模式、护城河与能力圈边界。",
+      "financials": "【草稿】待分析营收利润质量、现金流与 ROE。",
+      "valuation": "【草稿】待对照历史估值与同业位置。",
+      "peers": "【草稿】待补充同业与海外可比定锚。",
+      "scenarios": [
+        {
+          "name": "悲观",
+          "assumption": "待分析",
+          "fairValue": "待校准"
+        },
+        {
+          "name": "中性",
+          "assumption": "待分析",
+          "fairValue": "待校准"
+        },
+        {
+          "name": "乐观",
+          "assumption": "待分析",
+          "fairValue": "待校准"
+        }
+      ],
+      "raiseBuyPriceWhen": [
+        "业绩与质量假设得到验证后，可上修买入区间。"
+      ],
+      "vetoTriggers": [
+        "基本面恶化或估值逻辑失效时，区间作废。"
+      ],
+      "reportMarkdown": "",
+      "analyzedAt": null,
+      "model": null
+    }
   }
 ]
