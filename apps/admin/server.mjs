@@ -5,16 +5,21 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import {
   analyzePrompt,
-  buildStock,
+  buildStockFromLookup,
+  ingestAnalysis,
   loadPrices,
   loadSettings,
   loadSource,
+  lookupStock,
   pricesPath,
+  pushSource,
   root,
+  runPathFor,
   runSeed,
   saveJson,
   settingsPath,
   sourcePath,
+  upsertPriceQuote,
 } from "./lib/data.mjs";
 import {
   codexVersion,
@@ -98,6 +103,15 @@ function resolvedCodex() {
   };
 }
 
+function stockRow(stock, prices) {
+  return {
+    ...stock,
+    currentPrice: prices.quotes?.[stock.symbol]?.currentPrice ?? null,
+    asOf: prices.quotes?.[stock.symbol]?.asOf ?? prices.asOf ?? null,
+    hasDetailAnalysis: Boolean(stock.analysis?.business && !String(stock.analysis.business).includes("【草稿】")),
+  };
+}
+
 async function handleApi(req, res, pathname) {
   if (req.method === "GET" && pathname === "/api/health") {
     json(res, 200, { ok: true, host: HOST, port: PORT, root });
@@ -113,11 +127,7 @@ async function handleApi(req, res, pathname) {
     const stocks = loadSource();
     const prices = loadPrices();
     json(res, 200, {
-      stocks: stocks.map((stock) => ({
-        ...stock,
-        currentPrice: prices.quotes?.[stock.symbol]?.currentPrice ?? null,
-        asOf: prices.quotes?.[stock.symbol]?.asOf ?? prices.asOf ?? null,
-      })),
+      stocks: stocks.map((stock) => stockRow(stock, prices)),
       pricesAsOf: prices.asOf ?? null,
     });
     return;
@@ -147,17 +157,33 @@ async function handleApi(req, res, pathname) {
       ...current,
       analysisModel: String(body.analysisModel ?? current.analysisModel ?? "").trim(),
       codexBinary: String(body.codexBinary ?? current.codexBinary ?? "auto").trim() || "auto",
-      // analysis always needs write access to data/
       sandbox: "workspace-write",
     };
     if (body.autoSeedAfterWrite != null) {
       next.autoSeedAfterWrite = Boolean(body.autoSeedAfterWrite);
+    }
+    if (body.autoPushAfterAnalyze != null) {
+      next.autoPushAfterAnalyze = Boolean(body.autoPushAfterAnalyze);
     }
     saveJson(settingsPath, next);
     json(res, 200, { ...next, ...resolvedCodex() });
     return;
   }
 
+  // Preview name/industry by code only (does not write source)
+  if (req.method === "GET" && pathname.startsWith("/api/lookup/")) {
+    const symbol = pathname.split("/").pop() ?? "";
+    try {
+      const meta = await lookupStock(symbol);
+      const exists = loadSource().some((s) => s.symbol === meta.symbol);
+      json(res, 200, { ...meta, exists });
+    } catch (error) {
+      json(res, 400, { error: String(error.message ?? error) });
+    }
+    return;
+  }
+
+  // Add stock: body = { symbol } only; name/industry from lookup
   if (req.method === "POST" && pathname === "/api/stocks") {
     const body = await readBody(req);
     const symbol = String(body.symbol ?? "").replace(/\D/g, "");
@@ -170,11 +196,42 @@ async function handleApi(req, res, pathname) {
       json(res, 409, { error: `${symbol} already exists` });
       return;
     }
+
+    let meta;
+    try {
+      meta = await lookupStock(symbol);
+    } catch (error) {
+      json(res, 400, { error: String(error.message ?? error) });
+      return;
+    }
+
+    if (meta.currentPrice != null) {
+      upsertPriceQuote(meta.symbol, meta.currentPrice, meta.asOf);
+    }
+
     const prices = loadPrices();
-    const stock = buildStock({ ...body, symbol }, prices.quotes?.[symbol]?.currentPrice);
+    const stock = buildStockFromLookup(
+      meta,
+      prices.quotes?.[symbol]?.currentPrice ?? meta.currentPrice,
+    );
     stocks.push(stock);
     saveJson(sourcePath, stocks);
-    json(res, 201, { stock, seedLog: maybeSeed() });
+
+    let seedLog = null;
+    let seedError = null;
+    try {
+      seedLog = maybeSeed();
+    } catch (error) {
+      seedError = String(error.message ?? error);
+    }
+
+    json(res, 201, {
+      stock: stockRow(stock, loadPrices()),
+      lookup: meta,
+      seedLog,
+      seedError,
+      note: "已录入草稿。请点「AI 分析」生成价值投资字段并入库。",
+    });
     return;
   }
 
@@ -201,6 +258,20 @@ async function handleApi(req, res, pathname) {
     return;
   }
 
+  // Deterministic ingest only (if run file already exists)
+  if (req.method === "POST" && pathname.startsWith("/api/ingest/")) {
+    const symbol = pathname.split("/").pop() ?? "";
+    try {
+      const result = ingestAnalysis(symbol);
+      const seedLog = maybeSeed();
+      json(res, 200, { ingest: result, seedLog });
+    } catch (error) {
+      json(res, 400, { error: String(error.message ?? error) });
+    }
+    return;
+  }
+
+  // Full pipeline: codex → ingest → seed → push source only
   if (req.method === "POST" && pathname.startsWith("/api/analyze/")) {
     const symbol = pathname.split("/").pop() ?? "";
     const stock = loadSource().find((s) => s.symbol === symbol);
@@ -220,6 +291,7 @@ async function handleApi(req, res, pathname) {
       json(res, 400, { error: "No analysis model selected and no Codex default found" });
       return;
     }
+
     const args = [
       "exec",
       "-m",
@@ -234,14 +306,71 @@ async function handleApi(req, res, pathname) {
       cwd: root,
       encoding: "utf8",
       env: process.env,
-      maxBuffer: 16 * 1024 * 1024,
+      maxBuffer: 32 * 1024 * 1024,
     });
-    json(res, result.status === 0 ? 200 : 500, {
-      status: result.status,
-      stdout: result.stdout,
-      stderr: result.stderr,
-      command: [resolved.binary.path, ...args].join(" "),
+
+    if (result.status !== 0) {
+      json(res, 500, {
+        stage: "codex",
+        status: result.status,
+        stdout: result.stdout,
+        stderr: result.stderr,
+        command: [resolved.binary.path, ...args.slice(0, -1), "<prompt>"].join(" "),
+        model: resolved.effectiveModel,
+        runPath: runPathFor(symbol),
+      });
+      return;
+    }
+
+    let ingestResult;
+    try {
+      ingestResult = ingestAnalysis(symbol);
+    } catch (error) {
+      json(res, 500, {
+        stage: "ingest",
+        error: String(error.message ?? error),
+        stdout: result.stdout,
+        stderr: result.stderr,
+        runPath: runPathFor(symbol),
+        hint: "Codex 已结束但 run JSON 校验失败。请检查 data/anysis/runs/<symbol>.json 后可 POST /api/ingest/:symbol 重试。",
+      });
+      return;
+    }
+
+    let seedLog = null;
+    let seedError = null;
+    try {
+      seedLog = runSeed();
+    } catch (error) {
+      seedError = String(error.message ?? error);
+    }
+
+    let pushResult = null;
+    let pushError = null;
+    if (loadSettings().autoPushAfterAnalyze !== false) {
+      try {
+        pushResult = pushSource({
+          message: `analysis: update ${stock.symbol} ${stock.name}`,
+        });
+      } catch (error) {
+        pushError = String(error.message ?? error);
+      }
+    }
+
+    json(res, seedError ? 500 : 200, {
+      stage: "done",
+      status: 0,
       model: resolved.effectiveModel,
+      ingest: ingestResult,
+      seedLog,
+      seedError,
+      push: pushResult,
+      pushError,
+      stock: stockRow(
+        loadSource().find((s) => s.symbol === symbol),
+        loadPrices(),
+      ),
+      stdoutTail: (result.stdout || "").slice(-4000),
     });
     return;
   }
