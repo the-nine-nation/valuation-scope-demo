@@ -40,29 +40,32 @@ test("server-renders the sortable stock overview grid", async () => {
   assert.match(html, /较理想高|贴近理想|已在理想区|低于理想/);
   assert.match(html, /可多选/);
   assert.match(html, /mini-scale-marker/);
-  assert.equal((html.match(/class="stock-card"/g) ?? []).length, 6);
-  assert.equal((html.match(/mini-scale-marker/g) ?? []).length, 6);
+  const cardCount = (html.match(/class="stock-card"/g) ?? []).length;
+  assert.ok(cardCount >= 6, `expected >=6 stock cards, got ${cardCount}`);
+  assert.equal((html.match(/mini-scale-marker/g) ?? []).length, cardCount);
   assert.match(html, /数据已从 SQLite 快照载入/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/);
 });
 
-test("ships six stocks with exactly five valuation bands each", async () => {
+test("ships stocks with exactly five valuation bands and analysis payload", async () => {
   const raw = await readFile(
     new URL("../../apps/web/app/data/stocks.generated.json", import.meta.url),
     "utf8",
   );
   const stocks = JSON.parse(raw);
 
-  assert.equal(stocks.length, 6);
-  assert.deepEqual(
-    stocks.map((stock) => stock.name),
-    ["招商证券", "珀莱雅", "中国太保", "分众传媒", "海尔智家", "紫光国微"],
-  );
+  assert.ok(stocks.length >= 6);
+  assert.equal(stocks[0].name, "招商证券");
   for (const stock of stocks) {
     assert.equal(stock.bands.length, 5, `${stock.name} should have five bands`);
     assert.deepEqual(
       stock.bands.map((band) => band.level),
       [1, 2, 3, 4, 5],
+    );
+    assert.ok(stock.analysis, `${stock.name} should carry analysis`);
+    assert.ok(
+      stock.analysis.business && stock.analysis.business.length >= 20,
+      `${stock.name} analysis.business too short`,
     );
   }
 });

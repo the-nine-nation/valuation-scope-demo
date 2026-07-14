@@ -20,7 +20,10 @@
     "port:free": "node tools/scripts/ensure-port.mjs",
     "db:seed": "node tools/scripts/seed-stock-db.mjs",
     "db:generate": "npm run db:generate --prefix apps/web",
-    "test": "npm run build && node --test tools/tests/rendered-html.test.mjs",
+    "lookup": "node tools/scripts/lookup-stock.mjs",
+    "analysis:ingest": "node tools/scripts/ingest-analysis.mjs",
+    "analysis:push": "node tools/scripts/push-source.mjs",
+    "test": "npm run build && node --test tools/tests/rendered-html.test.mjs tools/tests/analysis-pipeline.test.mjs",
     "lint": "npm run lint --prefix apps/web"
   },
   "workspaces": [

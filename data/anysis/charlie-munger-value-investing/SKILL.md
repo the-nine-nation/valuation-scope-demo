@@ -102,3 +102,79 @@ description: >-
 - 海外估值只作定锚，禁止照搬。  
 - 数据缺失须写明缺口，并加大安全边际或中止结论。  
 - **最终报告语言：中文。**
+
+## 入库交付（管理页 / Codex 分析必做）
+
+本仓库的公网页只读 `data/stocks.source.json` 经 seed 后的字段。  
+**仅写 Markdown 报告不够**——必须产出可校验的 JSON，再由确定性脚本入库。
+
+### 1. 写 run 文件（Codex 负责）
+
+路径（固定）：
+
+```text
+data/anysis/runs/<symbol>.json
+```
+
+例如 `600519` → `data/anysis/runs/600519.json`。
+
+**禁止**直接手改 `data/stocks.source.json` 中其他股票；只写本 symbol 的 run 文件。  
+**禁止**写入 `currentPrice` / `asOf` / `valuation`（现价在 `prices.snapshot.json`）。  
+**禁止** `git commit` / `git push`（由管理页脚本 `tools/scripts/push-source.mjs` 只推 source）。
+
+### 2. JSON 合同（必须通过校验）
+
+完整 schema 见 `tools/scripts/analysis-schema.mjs`（`ANALYSIS_RUN_CONTRACT`）。最小形状：
+
+```json
+{
+  "symbol": "600519",
+  "quality": "A",
+  "idealPrice": "¥1200–1300",
+  "valuationAnchor": "2026E PE xx×",
+  "thesis": "2–4 句卡片摘要…",
+  "keyRisk": "关键否决风险…",
+  "bands": [
+    ["深度低估", "¥xx 以下", null, 0, "…"],
+    ["舒适买入", "¥xx–yy", 0, 0, "…"],
+    ["合理偏低", "¥xx–yy", 0, 0, "…"],
+    ["合理区", "¥xx–yy", 0, 0, "…"],
+    ["偏贵区", "¥xx 以上", 0, null, "…"]
+  ],
+  "analysis": {
+    "summary": "一句话结论",
+    "stage": "成熟稳定",
+    "circleOfCompetence": "在圈内",
+    "priceVerdict": "合理",
+    "business": "业务与护城河段落…",
+    "financials": "财报质量段落…",
+    "valuation": "估值位置段落…",
+    "peers": "同业定锚段落…",
+    "scenarios": [
+      { "name": "悲观", "assumption": "…", "fairValue": "¥…" },
+      { "name": "中性", "assumption": "…", "fairValue": "¥…" },
+      { "name": "乐观", "assumption": "…", "fairValue": "¥…" }
+    ],
+    "raiseBuyPriceWhen": ["…"],
+    "vetoTriggers": ["…"],
+    "reportMarkdown": "可选完整中文报告",
+    "analyzedAt": "YYYY-MM-DD"
+  }
+}
+```
+
+硬约束：
+
+- `bands` **正好 5 档**；`lower`/`upper` 为 number 或 `null`；相邻区间合理。  
+- `analysis.business` / `financials` / `valuation` 各 ≥ 20 字（详情页展示用）。  
+- `analysis.scenarios` ≥ 3 条。  
+- 全文中文。
+
+### 3. 确定性入库（脚本负责，不要跳过）
+
+```bash
+node tools/scripts/ingest-analysis.mjs <symbol>
+# 校验 run JSON → 只合并该 symbol 的价值投资字段到 data/stocks.source.json
+```
+
+管理页「重新分析」会：`codex exec` → `ingest-analysis` → `db:seed` → `push-source`（仅 source 文件）。

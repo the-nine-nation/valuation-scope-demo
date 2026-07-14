@@ -33,6 +33,34 @@ function loadPrices() {
   };
 }
 
+function normalizeAnalysis(stock) {
+  const a = stock.analysis && typeof stock.analysis === "object" ? stock.analysis : {};
+  return {
+    summary: String(a.summary ?? stock.thesis ?? "").trim(),
+    stage: String(a.stage ?? "").trim() || null,
+    circleOfCompetence: String(a.circleOfCompetence ?? "").trim() || null,
+    priceVerdict: String(a.priceVerdict ?? "").trim() || null,
+    business: String(a.business ?? "").trim() || null,
+    financials: String(a.financials ?? "").trim() || null,
+    valuation: String(a.valuation ?? "").trim() || null,
+    peers: String(a.peers ?? "").trim() || null,
+    scenarios: Array.isArray(a.scenarios)
+      ? a.scenarios.map((s) => ({
+          name: String(s.name ?? "").trim(),
+          assumption: String(s.assumption ?? "").trim(),
+          fairValue: String(s.fairValue ?? "").trim(),
+        }))
+      : [],
+    raiseBuyPriceWhen: Array.isArray(a.raiseBuyPriceWhen)
+      ? a.raiseBuyPriceWhen.map(String)
+      : [],
+    vetoTriggers: Array.isArray(a.vetoTriggers) ? a.vetoTriggers.map(String) : [],
+    reportMarkdown: String(a.reportMarkdown ?? "").trim() || null,
+    analyzedAt: a.analyzedAt ? String(a.analyzedAt) : null,
+    model: a.model ? String(a.model) : null,
+  };
+}
+
 const stocks = JSON.parse(readFileSync(sourcePath, "utf8"));
 if (!Array.isArray(stocks) || stocks.length === 0) {
   throw new Error(`No stocks found in ${sourcePath}`);
@@ -59,6 +87,7 @@ const merged = stocks.map((stock) => {
     currentPrice,
     asOf,
     valuation,
+    analysis: normalizeAnalysis(stock),
   };
 });
 
@@ -84,7 +113,8 @@ db.exec(`
     thesis TEXT NOT NULL,
     ideal_price TEXT NOT NULL,
     valuation_anchor TEXT NOT NULL,
-    key_risk TEXT NOT NULL
+    key_risk TEXT NOT NULL,
+    analysis_json TEXT
   ) STRICT;
   CREATE TABLE IF NOT EXISTS valuation_bands (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,11 +129,18 @@ db.exec(`
   ) STRICT;
 `);
 
+// Migrate older DBs missing analysis_json
+try {
+  db.exec("ALTER TABLE stocks ADD COLUMN analysis_json TEXT");
+} catch {
+  // column already exists
+}
+
 const insertStock = db.prepare(`
   INSERT INTO stocks (
     symbol, name, market, industry, current_price, as_of, quality, valuation,
-    thesis, ideal_price, valuation_anchor, key_risk
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    thesis, ideal_price, valuation_anchor, key_risk, analysis_json
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 const insertBand = db.prepare(`
   INSERT INTO valuation_bands (
@@ -130,6 +167,7 @@ try {
       stock.idealPrice,
       stock.valuationAnchor,
       stock.keyRisk,
+      JSON.stringify(stock.analysis),
     );
     stock.bands.forEach((band, index) => {
       insertBand.run(result.lastInsertRowid, index + 1, ...band);
@@ -148,7 +186,7 @@ const rows = db
     s.id, s.symbol, s.name, s.market, s.industry,
     s.current_price AS currentPrice, s.as_of AS asOf, s.quality, s.valuation,
     s.thesis, s.ideal_price AS idealPrice, s.valuation_anchor AS valuationAnchor,
-    s.key_risk AS keyRisk,
+    s.key_risk AS keyRisk, s.analysis_json AS analysisJson,
     b.level, b.name AS bandName, b.range_label AS rangeLabel,
     b.lower_bound AS lowerBound, b.upper_bound AS upperBound, b.action
   FROM stocks s
@@ -162,6 +200,14 @@ const snapshot = [];
 for (const row of rows) {
   let stock = snapshot.at(-1);
   if (!stock || stock.id !== row.id) {
+    let analysis = null;
+    if (row.analysisJson) {
+      try {
+        analysis = JSON.parse(row.analysisJson);
+      } catch {
+        analysis = null;
+      }
+    }
     stock = {
       id: row.id,
       symbol: row.symbol,
@@ -176,6 +222,7 @@ for (const row of rows) {
       idealPrice: row.idealPrice,
       valuationAnchor: row.valuationAnchor,
       keyRisk: row.keyRisk,
+      analysis,
       bands: [],
     };
     snapshot.push(stock);
