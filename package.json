@@ -12,6 +12,7 @@
     "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
     "prestart": "npm run port:free",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start --port 5566",
+    "predeploy": "npm run db:seed",
     "deploy": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext deploy",
     "prices:update": "node scripts/update-prices.mjs",
     "port:free": "node scripts/ensure-port.mjs 5566",
