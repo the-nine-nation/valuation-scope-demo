@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const sourcePath = resolve(root, "data/stocks.source.json");
 const pricesPath = resolve(root, "data/prices.snapshot.json");
 
@@ -93,10 +93,14 @@ function writePrices(snapshot) {
 }
 
 function runSeed() {
-  const result = spawnSync(process.execPath, [resolve(root, "scripts/seed-stock-db.mjs")], {
-    cwd: root,
-    stdio: "inherit",
-  });
+  const result = spawnSync(
+    process.execPath,
+    [resolve(root, "tools/scripts/seed-stock-db.mjs")],
+    {
+      cwd: root,
+      stdio: "inherit",
+    },
+  );
   if (result.status !== 0) {
     throw new Error(`seed-stock-db failed with exit code ${result.status ?? "null"}`);
   }

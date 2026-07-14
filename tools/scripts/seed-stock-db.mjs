@@ -3,11 +3,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const sourcePath = resolve(root, "data/stocks.source.json");
 const pricesPath = resolve(root, "data/prices.snapshot.json");
 const databasePath = resolve(root, "data/stocks.db");
-const snapshotPath = resolve(root, "app/data/stocks.generated.json");
+const snapshotPath = resolve(root, "apps/web/app/data/stocks.generated.json");
 
 mkdirSync(dirname(databasePath), { recursive: true });
 mkdirSync(dirname(snapshotPath), { recursive: true });

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function render() {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  const workerUrl = new URL("../../apps/web/dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
 
@@ -48,7 +48,7 @@ test("server-renders the sortable stock overview grid", async () => {
 
 test("ships six stocks with exactly five valuation bands each", async () => {
   const raw = await readFile(
-    new URL("../app/data/stocks.generated.json", import.meta.url),
+    new URL("../../apps/web/app/data/stocks.generated.json", import.meta.url),
     "utf8",
   );
   const stocks = JSON.parse(raw);
