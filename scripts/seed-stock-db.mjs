@@ -1,19 +1,71 @@
 import { DatabaseSync } from "node:sqlite";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sourcePath = resolve(root, "data/stocks.source.json");
+const pricesPath = resolve(root, "data/prices.snapshot.json");
 const databasePath = resolve(root, "data/stocks.db");
 const snapshotPath = resolve(root, "app/data/stocks.generated.json");
 
 mkdirSync(dirname(databasePath), { recursive: true });
 mkdirSync(dirname(snapshotPath), { recursive: true });
 
+function resolveBandName(price, bands) {
+  for (const band of bands) {
+    const [name, , lower, upper] = band;
+    const aboveLower = lower === null || price >= lower;
+    const belowUpper = upper === null || price < upper;
+    if (aboveLower && belowUpper) return name;
+  }
+  return bands.at(-1)?.[0] ?? "未知";
+}
+
+function loadPrices() {
+  if (!existsSync(pricesPath)) {
+    return { asOf: null, quotes: {} };
+  }
+  const raw = JSON.parse(readFileSync(pricesPath, "utf8"));
+  return {
+    asOf: raw.asOf ?? null,
+    quotes: raw.quotes && typeof raw.quotes === "object" ? raw.quotes : {},
+  };
+}
+
 const stocks = JSON.parse(readFileSync(sourcePath, "utf8"));
 if (!Array.isArray(stocks) || stocks.length === 0) {
   throw new Error(`No stocks found in ${sourcePath}`);
+}
+
+const prices = loadPrices();
+const missingQuotes = [];
+const merged = stocks.map((stock) => {
+  if (stock.currentPrice != null || stock.asOf != null || stock.valuation != null) {
+    throw new Error(
+      `${stock.symbol}: price fields belong in data/prices.snapshot.json, not stocks.source.json`,
+    );
+  }
+  const quote = prices.quotes[stock.symbol];
+  if (!quote || !Number.isFinite(quote.currentPrice) || quote.currentPrice <= 0) {
+    missingQuotes.push(stock.symbol);
+    return null;
+  }
+  const currentPrice = Math.round(quote.currentPrice * 100) / 100;
+  const asOf = quote.asOf ?? prices.asOf ?? "unknown";
+  const valuation = resolveBandName(currentPrice, stock.bands);
+  return {
+    ...stock,
+    currentPrice,
+    asOf,
+    valuation,
+  };
+});
+
+if (missingQuotes.length > 0) {
+  throw new Error(
+    `Missing prices for: ${missingQuotes.join(", ")}. Run npm run prices:update first.`,
+  );
 }
 
 const db = new DatabaseSync(databasePath);
@@ -64,7 +116,7 @@ try {
   db.exec("DELETE FROM valuation_bands");
   db.exec("DELETE FROM stocks");
   db.exec("DELETE FROM sqlite_sequence WHERE name IN ('valuation_bands', 'stocks')");
-  for (const stock of stocks) {
+  for (const stock of merged) {
     const result = insertStock.run(
       stock.symbol,
       stock.name,
@@ -141,4 +193,6 @@ for (const row of rows) {
 writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`);
 db.close();
 
-console.log(`Seeded ${snapshot.length} stocks and ${rows.length} valuation bands.`);
+console.log(
+  `Seeded ${snapshot.length} stocks and ${rows.length} valuation bands from source + prices.`,
+);

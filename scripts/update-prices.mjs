@@ -1,10 +1,11 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sourcePath = resolve(root, "data/stocks.source.json");
+const pricesPath = resolve(root, "data/prices.snapshot.json");
 
 function exchangePrefix(symbol) {
   if (symbol.startsWith("6") || symbol.startsWith("9") || symbol.startsWith("5")) {
@@ -15,16 +16,6 @@ function exchangePrefix(symbol) {
 
 function quoteKey(symbol) {
   return `${exchangePrefix(symbol)}${symbol}`;
-}
-
-function resolveBandName(price, bands) {
-  for (const band of bands) {
-    const [name, , lower, upper] = band;
-    const aboveLower = lower === null || price >= lower;
-    const belowUpper = upper === null || price < upper;
-    if (aboveLower && belowUpper) return name;
-  }
-  return bands.at(-1)?.[0] ?? "未知";
 }
 
 function formatAsOf(raw) {
@@ -79,8 +70,26 @@ async function fetchQuotes(symbols) {
   return quotes;
 }
 
-function writeSource(stocks) {
-  writeFileSync(sourcePath, `${JSON.stringify(stocks, null, 2)}\n`);
+function loadExistingPrices() {
+  if (!existsSync(pricesPath)) {
+    return {
+      asOf: null,
+      updatedAt: null,
+      source: "tencent-gtimg",
+      quotes: {},
+    };
+  }
+  const raw = JSON.parse(readFileSync(pricesPath, "utf8"));
+  return {
+    asOf: raw.asOf ?? null,
+    updatedAt: raw.updatedAt ?? null,
+    source: raw.source ?? "tencent-gtimg",
+    quotes: raw.quotes && typeof raw.quotes === "object" ? { ...raw.quotes } : {},
+  };
+}
+
+function writePrices(snapshot) {
+  writeFileSync(pricesPath, `${JSON.stringify(snapshot, null, 2)}\n`);
 }
 
 function runSeed() {
@@ -98,40 +107,72 @@ if (!Array.isArray(stocks) || stocks.length === 0) {
   throw new Error(`No stocks found in ${sourcePath}`);
 }
 
-const quotes = await fetchQuotes(stocks.map((stock) => stock.symbol));
+const symbols = stocks.map((stock) => stock.symbol);
+const nameBySymbol = new Map(stocks.map((stock) => [stock.symbol, stock.name]));
+const liveQuotes = await fetchQuotes(symbols);
+const previous = loadExistingPrices();
+const nextQuotes = {};
 let changed = 0;
+let latestAsOf = null;
 
-for (const stock of stocks) {
-  const quote = quotes.get(quoteKey(stock.symbol));
-  if (!quote) {
-    console.warn(`No quote for ${stock.symbol} (${stock.name}); keeping previous price`);
+for (const symbol of symbols) {
+  const live = liveQuotes.get(quoteKey(symbol));
+  const prev = previous.quotes[symbol];
+  const name = nameBySymbol.get(symbol) ?? symbol;
+
+  if (!live) {
+    if (prev?.currentPrice) {
+      console.warn(`No quote for ${symbol} (${name}); keeping previous price ¥${prev.currentPrice}`);
+      nextQuotes[symbol] = {
+        currentPrice: prev.currentPrice,
+        asOf: prev.asOf ?? null,
+      };
+      if (prev.asOf && (!latestAsOf || prev.asOf > latestAsOf)) latestAsOf = prev.asOf;
+    } else {
+      console.warn(`No quote for ${symbol} (${name}); no previous price to keep`);
+    }
     continue;
   }
 
-  const nextPrice = Math.round(quote.price * 100) / 100;
-  const nextAsOf = quote.asOf;
-  const nextValuation = resolveBandName(nextPrice, stock.bands);
-  const priceChanged = nextPrice !== stock.currentPrice;
-  const metaChanged = nextAsOf !== stock.asOf || nextValuation !== stock.valuation;
+  const nextPrice = Math.round(live.price * 100) / 100;
+  const nextAsOf = live.asOf;
+  const prevPrice = prev?.currentPrice;
+  const prevAsOf = prev?.asOf;
+  const priceChanged = prevPrice !== nextPrice;
+  const metaChanged = prevAsOf !== nextAsOf;
 
   if (priceChanged || metaChanged) {
     console.log(
-      `${stock.symbol} ${stock.name}: ¥${stock.currentPrice} → ¥${nextPrice} (${nextAsOf}) · ${nextValuation}`,
+      `${symbol} ${name}: ¥${prevPrice ?? "—"} → ¥${nextPrice} (${nextAsOf})`,
     );
-    stock.currentPrice = nextPrice;
-    stock.asOf = nextAsOf;
-    stock.valuation = nextValuation;
     changed += 1;
   } else {
-    console.log(`${stock.symbol} ${stock.name}: unchanged ¥${nextPrice} (${nextAsOf})`);
+    console.log(`${symbol} ${name}: unchanged ¥${nextPrice} (${nextAsOf})`);
   }
+
+  nextQuotes[symbol] = {
+    currentPrice: nextPrice,
+    asOf: nextAsOf,
+  };
+  if (nextAsOf && (!latestAsOf || nextAsOf > latestAsOf)) latestAsOf = nextAsOf;
 }
 
-if (changed === 0) {
-  console.log("All prices already up to date; regenerating snapshot anyway.");
+const snapshot = {
+  asOf: latestAsOf,
+  updatedAt: new Date().toISOString(),
+  source: "tencent-gtimg",
+  quotes: nextQuotes,
+};
+
+const previousQuoteJson = JSON.stringify(previous.quotes);
+const nextQuoteJson = JSON.stringify(nextQuotes);
+const quotesChanged = previousQuoteJson !== nextQuoteJson;
+
+if (quotesChanged) {
+  writePrices(snapshot);
+  console.log(`Wrote ${changed} changed quote(s) to ${pricesPath}`);
 } else {
-  writeSource(stocks);
-  console.log(`Updated ${changed} stock price(s) in ${sourcePath}`);
+  console.log(`All prices already up to date in ${pricesPath}`);
 }
 
 runSeed();
