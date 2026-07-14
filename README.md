@@ -69,10 +69,15 @@ Secrets：`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`。
 
 - 绑定 **`127.0.0.1:5567`**，不会随 `npm run deploy` 上线  
 - 可设置 Codex 分析模型（`codex exec -m <model>`）  
-- 新增 / 删除写共享 `data/`；「重新分析」调用本机 Codex CLI  
-
-程序式指定模型示例：
+- **新增股票只填 6 位代码** → 自动查名称/行业 → 确认后入池（草稿）→ 再点「AI 分析」  
+- 「AI 分析」流水线：  
+  1. Codex 按 skill 写 `data/anysis/runs/<代码>.json`  
+  2. `node tools/scripts/ingest-analysis.mjs` 校验并**只合并该股票**价值投资字段到 `stocks.source.json`  
+  3. `db:seed`  
+  4. `push-source`：**只** commit/push `data/stocks.source.json`  
 
 ```bash
-codex exec -m gpt-5.4 --sandbox workspace-write "分析 600519 ..."
+npm run lookup -- 600519
+npm run analysis:ingest -- 600519
+npm run analysis:push -- --message "analysis: update 600519"
 ```

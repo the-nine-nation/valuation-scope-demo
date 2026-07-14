@@ -512,6 +512,129 @@ export function StockDashboard({ stocks }: { stocks: Stock[] }) {
             </article>
           </section>
 
+          {activeStock.analysis && (
+            <section className="deep-analysis" aria-labelledby="deep-analysis-title">
+              <div className="section-heading">
+                <div>
+                  <span className="eyebrow">深度研究</span>
+                  <h2 id="deep-analysis-title">价值投资详细分析</h2>
+                </div>
+                <span className="source-chip">
+                  {[
+                    activeStock.analysis.analyzedAt && `分析日 ${activeStock.analysis.analyzedAt}`,
+                    activeStock.analysis.model && `模型 ${activeStock.analysis.model}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "结构化字段"}
+                </span>
+              </div>
+
+              {activeStock.analysis.summary && (
+                <p className="deep-summary">{activeStock.analysis.summary}</p>
+              )}
+
+              <div className="deep-tags">
+                {activeStock.analysis.stage && (
+                  <span className="deep-tag">阶段 · {activeStock.analysis.stage}</span>
+                )}
+                {activeStock.analysis.circleOfCompetence && (
+                  <span className="deep-tag">
+                    能力圈 · {activeStock.analysis.circleOfCompetence}
+                  </span>
+                )}
+                {activeStock.analysis.priceVerdict && (
+                  <span className="deep-tag">
+                    价格判断 · {activeStock.analysis.priceVerdict}
+                  </span>
+                )}
+              </div>
+
+              <div className="deep-grid">
+                {activeStock.analysis.business && (
+                  <article className="deep-card">
+                    <span className="eyebrow">业务与护城河</span>
+                    <h3>是不是好公司？</h3>
+                    <p>{activeStock.analysis.business}</p>
+                  </article>
+                )}
+                {activeStock.analysis.financials && (
+                  <article className="deep-card">
+                    <span className="eyebrow">财报质量</span>
+                    <h3>利润与现金流靠谱吗？</h3>
+                    <p>{activeStock.analysis.financials}</p>
+                  </article>
+                )}
+                {activeStock.analysis.valuation && (
+                  <article className="deep-card">
+                    <span className="eyebrow">估值位置</span>
+                    <h3>现在贵还是便宜？</h3>
+                    <p>{activeStock.analysis.valuation}</p>
+                  </article>
+                )}
+                {activeStock.analysis.peers && (
+                  <article className="deep-card">
+                    <span className="eyebrow">同业定锚</span>
+                    <h3>横向怎么比？</h3>
+                    <p>{activeStock.analysis.peers}</p>
+                  </article>
+                )}
+              </div>
+
+              {activeStock.analysis.scenarios?.length > 0 && (
+                <div className="scenario-block">
+                  <div className="section-heading compact">
+                    <div>
+                      <span className="eyebrow">三情景</span>
+                      <h3>悲观 / 中性 / 乐观</h3>
+                    </div>
+                  </div>
+                  <div className="scenario-grid">
+                    {activeStock.analysis.scenarios.map((scenario) => (
+                      <article className="scenario-card" key={scenario.name}>
+                        <strong>{scenario.name}</strong>
+                        <p>{scenario.assumption}</p>
+                        <em>合理价值 · {scenario.fairValue}</em>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="deep-lists">
+                {activeStock.analysis.raiseBuyPriceWhen?.length > 0 && (
+                  <article className="list-card">
+                    <span className="eyebrow">上修买入价条件</span>
+                    <h3>什么情况下可以提高买点？</h3>
+                    <ul>
+                      {activeStock.analysis.raiseBuyPriceWhen.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </article>
+                )}
+                {activeStock.analysis.vetoTriggers?.length > 0 && (
+                  <article className="list-card list-card-risk">
+                    <span className="eyebrow">否决触发</span>
+                    <h3>什么情况下区间作废？</h3>
+                    <ul>
+                      {activeStock.analysis.vetoTriggers.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </article>
+                )}
+              </div>
+
+              {activeStock.analysis.reportMarkdown && (
+                <article className="report-card">
+                  <span className="eyebrow">完整报告</span>
+                  <h3>研究笔记</h3>
+                  <pre className="report-md">{activeStock.analysis.reportMarkdown}</pre>
+                </article>
+              )}
+            </section>
+          )}
+
           <footer className="dashboard-footer">
             <span>数据已从 SQLite 快照载入 · 口径 {activeStock.asOf}</span>
             <span>仅作研究演示，不构成投资建议</span>

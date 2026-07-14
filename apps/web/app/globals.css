@@ -1614,6 +1614,160 @@ button {
   margin-top: 16px;
 }
 
+.deep-analysis {
+  margin-top: 18px;
+  padding: 26px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(16, 24, 36, 0.88), rgba(10, 16, 26, 0.92));
+  box-shadow: var(--shadow);
+}
+
+.deep-summary {
+  margin: 14px 0 0;
+  color: #c5d0db;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.deep-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.deep-tag {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  background: rgba(56, 189, 248, 0.08);
+  color: #7dd3fc;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.deep-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.deep-card {
+  padding: 16px 16px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(7, 12, 20, 0.55);
+}
+
+.deep-card h3,
+.scenario-block h3,
+.list-card h3,
+.report-card h3 {
+  margin: 6px 0 10px;
+  font-size: 15px;
+  color: #e8edf2;
+}
+
+.deep-card p,
+.scenario-card p,
+.list-card li {
+  margin: 0;
+  color: #9aabba;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.scenario-block {
+  margin-top: 20px;
+}
+
+.scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.scenario-card {
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(7, 12, 20, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 120px;
+}
+
+.scenario-card strong {
+  color: #fbbf24;
+  font-size: 13px;
+}
+
+.scenario-card em {
+  margin-top: auto;
+  font-style: normal;
+  color: #67e8f9;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.deep-lists {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.list-card {
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(7, 12, 20, 0.5);
+}
+
+.list-card-risk {
+  border-color: rgba(251, 146, 60, 0.22);
+  background: linear-gradient(160deg, rgba(28, 18, 14, 0.7), rgba(12, 10, 10, 0.7));
+}
+
+.list-card ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+}
+
+.report-card {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(7, 12, 20, 0.55);
+}
+
+.report-md {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #b7c2cc;
+  font-family: var(--font);
+  font-size: 12.5px;
+  line-height: 1.7;
+  max-height: 420px;
+  overflow: auto;
+}
+
+@media (max-width: 900px) {
+  .deep-grid,
+  .scenario-grid,
+  .deep-lists {
+    grid-template-columns: 1fr;
+  }
+}
+
 .thesis-card,
 .risk-card {
   padding: 26px;

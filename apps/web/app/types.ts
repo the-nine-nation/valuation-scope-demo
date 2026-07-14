@@ -7,6 +7,29 @@ export type ValuationBand = {
   action: string;
 };
 
+export type AnalysisScenario = {
+  name: string;
+  assumption: string;
+  fairValue: string;
+};
+
+export type StockAnalysis = {
+  summary: string;
+  stage: string | null;
+  circleOfCompetence: string | null;
+  priceVerdict: string | null;
+  business: string | null;
+  financials: string | null;
+  valuation: string | null;
+  peers: string | null;
+  scenarios: AnalysisScenario[];
+  raiseBuyPriceWhen: string[];
+  vetoTriggers: string[];
+  reportMarkdown: string | null;
+  analyzedAt: string | null;
+  model: string | null;
+};
+
 export type Stock = {
   id: number;
   symbol: string;
@@ -21,5 +44,6 @@ export type Stock = {
   idealPrice: string;
   valuationAnchor: string;
   keyRisk: string;
+  analysis?: StockAnalysis | null;
   bands: ValuationBand[];
 };
