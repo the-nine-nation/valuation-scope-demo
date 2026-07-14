@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Stock, ValuationBand } from "./types";
+import { useLiveQuotes } from "./use-live-quotes";
 
 const bandColors = ["#34d399", "#a3e635", "#fbbf24", "#fb923c", "#f87171"];
 const bandSoftColors = [
@@ -221,7 +222,8 @@ function formatLevelFilterLabel(levels: number[]) {
   return levels.map((level) => bandValuationLabels[level - 1]).join(" · ");
 }
 
-export function StockDashboard({ stocks }: { stocks: Stock[] }) {
+export function StockDashboard({ stocks: initialStocks }: { stocks: Stock[] }) {
+  const { stocks, liveOk, liveAsOf, liveError } = useLiveQuotes(initialStocks);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("level-asc");
@@ -231,6 +233,12 @@ export function StockDashboard({ stocks }: { stocks: Stock[] }) {
   const activeStock = activeId === null
     ? null
     : stocks.find((stock) => stock.id === activeId) ?? null;
+
+  const priceSourceLabel = liveOk
+    ? `实时行情 · ${liveAsOf ?? "腾讯"}`
+    : liveError
+      ? `快照价（实时暂不可用）`
+      : `快照载入中 · 将尝试实时行情`;
 
   const bandCounts = useMemo(
     () => [1, 2, 3, 4, 5].map((level) => ({
@@ -811,7 +819,7 @@ export function StockDashboard({ stocks }: { stocks: Stock[] }) {
                   <span className="stock-card-name">
                     <strong>{stock.name}</strong>
                     <small>
-                      {stock.symbol} · {stock.industry} · 快照 {stock.asOf}
+                      {stock.symbol} · {stock.industry} · {liveOk ? "实时" : "快照"} {stock.asOf}
                     </small>
                   </span>
                   <span className="stock-card-price">
@@ -880,7 +888,11 @@ export function StockDashboard({ stocks }: { stocks: Stock[] }) {
         </section>
 
         <footer className="dashboard-footer overview-footer">
-          <span>数据已从 SQLite 快照载入 · 非实时行情</span>
+          <span>
+            {liveOk
+              ? `现价来自腾讯实时行情（约 30s 刷新）· 分析文案来自快照`
+              : `数据已从 SQLite 快照载入 · ${priceSourceLabel}`}
+          </span>
           <span>仅作研究演示，不构成投资建议</span>
         </footer>
       </section>
