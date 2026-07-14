@@ -35,8 +35,6 @@ const localBindingConfig = {
 };
 
 export default defineConfig(async () => {
-  // Keep Wrangler and Miniflare state project-local. These are non-secret tool
-  // settings; application environment belongs in ignored `.env*` files.
   process.env.WRANGLER_WRITE_LOGS ??= "false";
   process.env.WRANGLER_LOG_PATH ??= ".wrangler/logs";
   process.env.MINIFLARE_REGISTRY_PATH ??= ".wrangler/registry";
@@ -45,9 +43,11 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    root: import.meta.dirname,
     server: {
       port: 5566,
       strictPort: true,
+      host: "127.0.0.1",
       ...(isCodexSeatbeltSandbox
         ? { watch: { useFsEvents: false, usePolling: true } }
         : {}),
@@ -55,6 +55,7 @@ export default defineConfig(async () => {
     preview: {
       port: 5566,
       strictPort: true,
+      host: "127.0.0.1",
     },
     plugins: [
       vinext(),
