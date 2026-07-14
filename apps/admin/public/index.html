@@ -82,6 +82,7 @@
         font-size: 0.75rem;
       }
       .badge.warn { background: #fff7ed; color: #9a3412; }
+      .badge.run { background: #eff6ff; color: #1d4ed8; }
       .hint { font-size: 0.8rem; color: var(--muted); margin: 8px 0 0; line-height: 1.45; }
       .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; word-break: break-all; }
       .ok { color: #065f46; }
@@ -97,20 +98,62 @@
       .preview.show { display: block; }
       .preview strong { font-size: 1.05rem; }
       .preview .meta { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
+      .job-panel {
+        border: 1px solid #bfdbfe;
+        background: #f8fbff;
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin-top: 12px;
+      }
+      .job-panel h3 { margin: 0 0 8px; font-size: 0.95rem; }
+      .job-meta { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+      .progress-bar {
+        height: 8px;
+        background: #e2e8f0;
+        border-radius: 999px;
+        overflow: hidden;
+        margin: 10px 0;
+      }
+      .progress-bar > i {
+        display: block;
+        height: 100%;
+        width: 8%;
+        background: linear-gradient(90deg, #0f766e, #2563eb);
+        border-radius: 999px;
+        transition: width 0.35s ease;
+      }
+      .job-logs {
+        max-height: 180px;
+        overflow: auto;
+        margin: 0;
+        background: #0c0a09;
+        color: #e7e5e4;
+        border-radius: 10px;
+        padding: 10px;
+        font-size: 0.75rem;
+      }
     </style>
   </head>
   <body>
     <main>
       <h1>估值刻度 · 本地管理</h1>
-      <p class="sub">仅监听 127.0.0.1 · 读写共享 <code>data/</code> · 分析后只 push <code>stocks.source.json</code></p>
+      <p class="sub">仅监听 127.0.0.1 · 分析异步可看进度 · 分析只 push source · 价格走 CI</p>
 
       <div class="grid">
         <section class="card">
           <h2>Codex 分析设置</h2>
           <div class="row">
             <div>
-              <label for="analysisModel">分析模型（实时从 Codex 拉取）</label>
+              <label for="analysisModel">分析模型</label>
               <select id="analysisModel"></select>
+            </div>
+            <div>
+              <label for="reasoningEffort">推理程度</label>
+              <select id="reasoningEffort">
+                <option value="low">low · 快</option>
+                <option value="medium" selected>medium · 中（推荐）</option>
+                <option value="high">high · 深</option>
+              </select>
             </div>
             <div>
               <label for="codexBinaryMode">Codex 可执行文件</label>
@@ -125,9 +168,9 @@
             </div>
           </div>
           <p class="hint">
-            流程：Codex 写 <code>data/anysis/runs/&lt;代码&gt;.json</code> →
-            <code>ingest-analysis</code> 校验入库 → seed →
-            仅 commit/push <code>data/stocks.source.json</code>。
+            默认 <code>gpt-5.6-sol</code> + <code>medium</code>。流程：后台 Codex →
+            <code>ingest</code> → seed → 仅 push <code>stocks.source.json</code>；
+            价格由 GitHub Actions <code>workflow_dispatch</code> 更新，避免与分析 commit 冲突。
           </p>
           <p class="hint mono" id="binaryInfo">探测中…</p>
           <p class="hint" id="modelsInfo"></p>
@@ -135,6 +178,7 @@
             <button id="saveSettings" type="button">保存设置</button>
             <button id="refreshCodex" class="secondary" type="button">刷新模型列表</button>
             <button id="seedNow" class="secondary" type="button">重新 seed</button>
+            <button id="triggerPrices" class="secondary" type="button">触发价格 CI</button>
           </p>
         </section>
 
@@ -155,8 +199,18 @@
             <div class="meta" id="previewMeta"></div>
           </div>
           <p class="hint">
-            先查询校验代码，确认名称与行业后再加入。加入后是<strong>草稿</strong>，需再点「AI 分析」才写入估值字段。
+            加入后本地会写入现价草稿，并尝试触发价格 CI。价值投资字段需再点「AI 分析」。
           </p>
+        </section>
+
+        <section class="card" id="jobCard" style="display:none">
+          <h2>分析进度</h2>
+          <div class="job-panel" id="jobPanel">
+            <h3 id="jobTitle">—</h3>
+            <div class="job-meta" id="jobMeta"></div>
+            <div class="progress-bar"><i id="jobBar"></i></div>
+            <pre class="job-logs" id="jobLogs"></pre>
+          </div>
         </section>
 
         <section class="card">
@@ -186,6 +240,20 @@
       const logEl = document.getElementById("log");
       let codexState = null;
       let pendingLookup = null;
+      /** @type {string|null} */
+      let watchingJobId = null;
+      let pollTimer = null;
+
+      const STAGE_PCT = {
+        queued: 5,
+        running: 10,
+        codex: 35,
+        ingest: 75,
+        seed: 85,
+        push: 92,
+        done: 100,
+        error: 100,
+      };
 
       function log(msg) {
         logEl.textContent = typeof msg === "string" ? msg : JSON.stringify(msg, null, 2);
@@ -197,7 +265,12 @@
           ...options,
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || res.statusText);
+        if (!res.ok) {
+          const err = new Error(data.error || res.statusText);
+          err.data = data;
+          err.status = res.status;
+          throw err;
+        }
         return data;
       }
 
@@ -207,21 +280,23 @@
         sel.innerHTML = "";
         if (!models.length) {
           const opt = document.createElement("option");
-          opt.value = "";
-          opt.textContent = "（未获取到模型）";
+          opt.value = "gpt-5.6-sol";
+          opt.textContent = "gpt-5.6-sol（默认）";
           sel.append(opt);
           return;
         }
         for (const m of models) {
           const opt = document.createElement("option");
           opt.value = m.slug;
+          const reason = m.defaultReasoning ? ` · default ${m.defaultReasoning}` : "";
           opt.textContent = m.displayName
-            ? `${m.displayName} (${m.slug})`
-            : m.slug;
+            ? `${m.displayName} (${m.slug})${reason}`
+            : `${m.slug}${reason}`;
           sel.append(opt);
         }
-        if (prev && [...sel.options].some((o) => o.value === prev)) {
-          sel.value = prev;
+        const prefer = prev || "gpt-5.6-sol";
+        if ([...sel.options].some((o) => o.value === prefer)) {
+          sel.value = prefer;
         }
       }
 
@@ -241,6 +316,8 @@
         modelsInfo.textContent = s.models?.length
           ? `模型列表来源：${s.modelsSource || "?"} · 共 ${s.models.length} 个` +
             (s.configDefaultModel ? ` · 本机默认 ${s.configDefaultModel}` : "") +
+            ` · 有效模型 ${s.effectiveModel || "—"}` +
+            ` · 推理 ${s.reasoningEffort || "medium"}` +
             (s.autoPushAfterAnalyze === false ? " · 分析后不自动 push" : " · 分析后自动 push source")
           : `模型列表为空${s.modelsError ? " · " + s.modelsError : ""}`;
 
@@ -256,7 +333,72 @@
           wrap.style.display = "";
           custom.value = saved;
         }
-        fillModelSelect(s.models || [], s.analysisModel || s.effectiveModel || s.configDefaultModel);
+        fillModelSelect(
+          s.models || [],
+          s.analysisModel || s.effectiveModel || "gpt-5.6-sol",
+        );
+        const effort = document.getElementById("reasoningEffort");
+        const e = s.reasoningEffort || "medium";
+        if ([...effort.options].some((o) => o.value === e)) effort.value = e;
+      }
+
+      function formatElapsed(ms) {
+        if (ms == null || ms < 0) return "—";
+        const s = Math.floor(ms / 1000);
+        if (s < 60) return `${s}s`;
+        return `${Math.floor(s / 60)}m ${s % 60}s`;
+      }
+
+      function renderJob(job) {
+        const card = document.getElementById("jobCard");
+        if (!job) {
+          card.style.display = "none";
+          return;
+        }
+        card.style.display = "";
+        document.getElementById("jobTitle").textContent =
+          `${job.symbol} ${job.name || ""} · ${job.status} / ${job.stage}`;
+        document.getElementById("jobMeta").innerHTML =
+          `model <strong>${job.model}</strong> · reasoning <strong>${job.reasoningEffort}</strong>` +
+          (job.pid ? ` · pid ${job.pid}` : "") +
+          (job.tokensUsed != null ? ` · tokens ~${job.tokensUsed}` : "") +
+          ` · 已用 ${formatElapsed(job.elapsedMs)}` +
+          (job.error ? `<br><span class="bad">${job.error}</span>` : "") +
+          (job.lastEvent ? `<br>最近：${job.lastEvent}` : "");
+        const pct = STAGE_PCT[job.stage] ?? 20;
+        document.getElementById("jobBar").style.width = `${pct}%`;
+        const logs = (job.logs || []).slice(-40).join("\n") || "（尚无事件）";
+        document.getElementById("jobLogs").textContent = logs;
+      }
+
+      function stopPoll() {
+        if (pollTimer) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+        }
+      }
+
+      async function pollJobOnce() {
+        if (!watchingJobId) return;
+        try {
+          const job = await api(`/api/jobs/${watchingJobId}`);
+          renderJob(job);
+          if (job.status === "done" || job.status === "error") {
+            stopPoll();
+            watchingJobId = null;
+            log(job.result || job);
+            await loadStocks();
+          }
+        } catch (e) {
+          log(String(e.message || e));
+        }
+      }
+
+      function watchJob(jobId) {
+        watchingJobId = jobId;
+        stopPoll();
+        pollJobOnce();
+        pollTimer = setInterval(pollJobOnce, 2000);
       }
 
       async function loadSettings() {
@@ -277,6 +419,7 @@
           modelsError: s.modelsError,
           configDefaultModel: s.configDefaultModel,
           effectiveModel: s.effectiveModel,
+          reasoningEffort: s.reasoningEffort,
           analysisModel: s.settings?.analysisModel,
           codexBinary: s.settings?.codexBinary,
           autoPushAfterAnalyze: s.settings?.autoPushAfterAnalyze,
@@ -311,38 +454,90 @@
         log(meta);
       }
 
+      let pricePollTimer = null;
+      /** @type {Record<string, {currentPrice:number, asOf:string}>} */
+      let liveQuotes = {};
+
+      async function refreshLiveQuotes(silent) {
+        try {
+          const data = await api("/api/quotes");
+          liveQuotes = data.quotes || {};
+          if (!silent) {
+            log({
+              liveQuotes: true,
+              asOf: data.asOf,
+              count: Object.keys(liveQuotes).length,
+              source: data.source,
+            });
+          }
+          return data;
+        } catch (e) {
+          if (!silent) log(`实时行情失败: ${e.message || e}`);
+          return null;
+        }
+      }
+
+      function priceCell(stock) {
+        const live = liveQuotes[stock.symbol];
+        const price = live?.currentPrice ?? stock.currentPrice;
+        const asOf = live?.asOf ?? stock.asOf ?? "";
+        const tag = live ? "实时" : "快照";
+        return `${price != null ? "¥" + price : "—"}<div style="color:#78716c;font-size:12px">${tag} ${asOf || ""}</div>`;
+      }
+
       async function loadStocks() {
         const data = await api("/api/stocks");
         document.getElementById("count").textContent = String(data.stocks.length);
         const tbody = document.getElementById("rows");
         tbody.innerHTML = "";
+
+        // Resume watching if any active job
+        const active = (data.jobs || []).find(
+          (j) => j.status === "running" || j.status === "queued",
+        );
+        if (active && !watchingJobId) {
+          watchJob(active.id);
+        }
+
         for (const stock of data.stocks) {
           const tr = document.createElement("tr");
-          const status = stock.hasDetailAnalysis
-            ? '<span class="badge">已分析</span>'
-            : '<span class="badge warn">草稿</span>';
+          tr.dataset.symbol = stock.symbol;
+          let status;
+          if (stock.activeJob) {
+            status = `<span class="badge run">${stock.activeJob.stage}</span>`;
+          } else if (stock.hasDetailAnalysis) {
+            status = '<span class="badge">已分析</span>';
+          } else {
+            status = '<span class="badge warn">草稿</span>';
+          }
           tr.innerHTML = `
             <td>${stock.symbol}</td>
             <td>${stock.name}<div style="color:#78716c;font-size:12px">${stock.industry || ""}</div></td>
-            <td>${stock.currentPrice != null ? "¥" + stock.currentPrice : "—"}<div style="color:#78716c;font-size:12px">${stock.asOf || ""}</div></td>
+            <td class="price-cell">${priceCell(stock)}</td>
             <td>${stock.quality || ""}</td>
             <td>${status}</td>
             <td class="actions"></td>
           `;
           const actions = tr.querySelector(".actions");
           const analyzeBtn = document.createElement("button");
-          analyzeBtn.textContent = "AI 分析";
+          analyzeBtn.textContent = stock.activeJob ? "分析中…" : "AI 分析";
           analyzeBtn.type = "button";
+          analyzeBtn.disabled = Boolean(stock.activeJob);
           analyzeBtn.onclick = async () => {
             analyzeBtn.disabled = true;
-            log(`正在 AI 分析 ${stock.symbol} ${stock.name}（可能数分钟）…\n完成后会自动 ingest + seed + push source。`);
+            log(`启动 AI 分析 ${stock.symbol} ${stock.name}（异步，见上方进度）…`);
             try {
               const result = await api(`/api/analyze/${stock.symbol}`, { method: "POST" });
               log(result);
+              if (result.job?.id) watchJob(result.job.id);
               await loadStocks();
             } catch (e) {
-              log(String(e.message || e));
-            } finally {
+              if (e.status === 409 && e.data?.job?.id) {
+                log(e.data);
+                watchJob(e.data.job.id);
+              } else {
+                log(String(e.message || e));
+              }
               analyzeBtn.disabled = false;
             }
           };
@@ -361,6 +556,26 @@
         }
       }
 
+      function patchPriceCells() {
+        for (const tr of document.querySelectorAll("#rows tr[data-symbol]")) {
+          const symbol = tr.dataset.symbol;
+          const cell = tr.querySelector(".price-cell");
+          if (!cell || !symbol) continue;
+          const live = liveQuotes[symbol];
+          if (!live) continue;
+          cell.innerHTML =
+            `¥${live.currentPrice}<div style="color:#78716c;font-size:12px">实时 ${live.asOf || ""}</div>`;
+        }
+      }
+
+      function startPricePoll() {
+        if (pricePollTimer) clearInterval(pricePollTimer);
+        void refreshLiveQuotes(true).then(() => patchPriceCells());
+        pricePollTimer = setInterval(() => {
+          void refreshLiveQuotes(true).then(() => patchPriceCells());
+        }, 30_000);
+      }
+
       document.getElementById("codexBinaryMode").onchange = () => {
         const mode = document.getElementById("codexBinaryMode").value;
         document.getElementById("customBinaryWrap").style.display =
@@ -371,6 +586,7 @@
         const mode = document.getElementById("codexBinaryMode").value;
         const body = {
           analysisModel: document.getElementById("analysisModel").value.trim(),
+          reasoningEffort: document.getElementById("reasoningEffort").value,
           codexBinary:
             mode === "auto"
               ? "auto"
@@ -382,7 +598,12 @@
           body: JSON.stringify(body),
         });
         renderCodexInfo(saved);
-        log({ saved: true, effectiveModel: saved.effectiveModel, binary: saved.resolvedBinary });
+        log({
+          saved: true,
+          effectiveModel: saved.effectiveModel,
+          reasoningEffort: saved.reasoningEffort,
+          binary: saved.resolvedBinary,
+        });
       };
 
       document.getElementById("refreshCodex").onclick = () =>
@@ -391,6 +612,16 @@
       document.getElementById("seedNow").onclick = async () => {
         const result = await api("/api/seed", { method: "POST" });
         log(result);
+      };
+
+      document.getElementById("triggerPrices").onclick = async () => {
+        log("触发价格 CI…");
+        try {
+          const result = await api("/api/prices/trigger", { method: "POST" });
+          log(result);
+        } catch (e) {
+          log(String(e.message || e));
+        }
       };
 
       document.getElementById("lookupBtn").onclick = () =>
@@ -425,9 +656,9 @@
         await loadStocks();
       };
 
-      Promise.all([loadSettings(), loadStocks()]).catch((e) =>
-        log(String(e.message || e)),
-      );
+      Promise.all([loadSettings(), loadStocks()])
+        .then(() => startPricePoll())
+        .catch((e) => log(String(e.message || e)));
     </script>
   </body>
 </html>

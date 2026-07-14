@@ -160,7 +160,10 @@ export function buildAnalyzeExecArgs({
   workspace,
   prompt,
   lastMessagePath = null,
+  reasoningEffort = "medium",
+  jsonEvents = true,
 }) {
+  const effort = String(reasoningEffort || "medium").trim() || "medium";
   const args = [
     "exec",
     "-m",
@@ -180,7 +183,13 @@ export function buildAnalyzeExecArgs({
     // Avoid desktop notify hooks in non-interactive spawn
     "-c",
     "notify=[]",
+    // User default is high; analysis wants medium unless overridden
+    "-c",
+    `model_reasoning_effort="${effort}"`,
   ];
+  if (jsonEvents) {
+    args.push("--json");
+  }
   if (lastMessagePath) {
     args.push("-o", lastMessagePath);
   }
@@ -199,4 +208,73 @@ export function analyzeSpawnOptions(workspace, timeoutMs = 25 * 60 * 1000) {
     // Critical: without this, codex may wait for more stdin forever
     stdio: ["ignore", "pipe", "pipe"],
   };
+}
+
+/**
+ * Parse one JSONL event line from `codex exec --json`.
+ * Returns a short human progress string + optional token total.
+ */
+export function summarizeCodexJsonLine(line) {
+  const raw = String(line || "").trim();
+  if (!raw.startsWith("{")) return null;
+  let obj;
+  try {
+    obj = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  const type = obj.type || obj.payload?.type || "";
+  const payload = obj.payload && typeof obj.payload === "object" ? obj.payload : obj;
+
+  if (type === "thread.started" || type === "session_meta") {
+    return { event: "session_started", text: "Codex session started" };
+  }
+  if (type === "turn.started" || type === "task_started") {
+    return { event: "turn_started", text: "model turn started" };
+  }
+  if (type === "agent_message" || payload?.type === "agent_message") {
+    const msg = String(payload.message || payload.text || "").slice(0, 120);
+    return msg ? { event: "message", text: `agent: ${msg}` } : null;
+  }
+  if (type === "item.completed" || payload?.type === "item.completed") {
+    const itemType = payload.item?.type || payload.type || "item";
+    return { event: "item", text: `item done: ${itemType}` };
+  }
+  if (
+    type === "function_call" ||
+    type === "custom_tool_call" ||
+    payload?.type === "function_call" ||
+    payload?.type === "custom_tool_call" ||
+    payload?.type === "tool_call"
+  ) {
+    const name =
+      payload.name ||
+      payload.tool_name ||
+      payload.item?.name ||
+      payload.call?.name ||
+      "tool";
+    return { event: "tool", text: `tool: ${name}` };
+  }
+  if (type === "token_count" || payload?.type === "token_count") {
+    const info = payload.info || payload;
+    const total =
+      info?.total_token_usage?.total_tokens ??
+      info?.total_tokens ??
+      null;
+    return {
+      event: "tokens",
+      text: total != null ? `tokens ~${total}` : "token update",
+      tokensUsed: typeof total === "number" ? total : null,
+    };
+  }
+  if (type === "error" || payload?.type === "error") {
+    return {
+      event: "error",
+      text: `error: ${payload.message || payload.error || raw.slice(0, 160)}`,
+    };
+  }
+  if (type === "turn.completed" || type === "task_complete") {
+    return { event: "turn_done", text: "model turn completed" };
+  }
+  return null;
 }

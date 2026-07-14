@@ -20,12 +20,22 @@ export const defaultSettings = {
   /** "auto" = resolve PATH / ChatGPT.app bundle at runtime */
   codexBinary: "auto",
   /** empty = use ~/.codex/config.toml model, else first listed model */
-  analysisModel: "",
+  analysisModel: "gpt-5.6-sol",
+  /** low | medium | high — forced via -c model_reasoning_effort */
+  reasoningEffort: "medium",
   /** analysis must write data/anysis/runs + ingest into source */
   sandbox: "workspace-write",
   autoSeedAfterWrite: true,
   /** after successful ingest, commit+push only data/stocks.source.json */
   autoPushAfterAnalyze: true,
+  /**
+   * After add-stock / analyze, trigger GitHub Actions prices workflow
+   * (workflow_dispatch) so prices stay on the CI-owned file and avoid
+   * conflict with source-only analysis commits.
+   */
+  autoTriggerPricesWorkflow: true,
+  /** if remote dispatch unavailable, run prices:update locally (no git push) */
+  pricesWorkflowLocalFallback: true,
 };
 
 export function loadJson(path, fallback) {
