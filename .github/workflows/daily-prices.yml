@@ -2,9 +2,11 @@ name: Daily prices and deploy
 
 on:
   schedule:
-    # 每个交易日北京时间 16:10（A 股收盘后）≈ UTC 08:10
     - cron: "10 8 * * 1-5"
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -15,6 +17,7 @@ concurrency:
 
 jobs:
   update-prices:
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -37,7 +40,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/stocks.source.json app/data/stocks.generated.json
+          git add data/prices.snapshot.json
           if git diff --cached --quiet; then
             echo "No price changes to commit."
           else
@@ -47,11 +50,24 @@ jobs:
 
   deploy:
     needs: update-prices
+    if: >
+      always() &&
+      (needs.update-prices.result == 'success' || needs.update-prices.result == 'skipped') &&
+      !(github.event_name == 'push' && (github.actor == 'github-actions[bot]' || github.actor == 'dependabot[bot]'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Sync latest main
+        run: |
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -61,6 +77,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Seed snapshot from source + prices
+        run: npm run db:seed
 
       - name: Deploy to Cloudflare Workers
         env:
