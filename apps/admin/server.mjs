@@ -22,6 +22,8 @@ import {
   upsertPriceQuote,
 } from "./lib/data.mjs";
 import {
+  analyzeSpawnOptions,
+  buildAnalyzeExecArgs,
   codexVersion,
   listCodexModels,
   readCodexConfigDefaultModel,
@@ -292,32 +294,35 @@ async function handleApi(req, res, pathname) {
       return;
     }
 
-    const args = [
-      "exec",
-      "-m",
-      resolved.effectiveModel,
-      "-C",
-      root,
-      "--sandbox",
-      "workspace-write",
-      analyzePrompt(stock, resolved.effectiveModel),
-    ];
-    const result = spawnSync(resolved.binary.path, args, {
-      cwd: root,
-      encoding: "utf8",
-      env: process.env,
-      maxBuffer: 32 * 1024 * 1024,
+    const lastMessagePath = resolve(root, "data/anysis/runs", `${symbol}.last.txt`);
+    const args = buildAnalyzeExecArgs({
+      model: resolved.effectiveModel,
+      workspace: root,
+      prompt: analyzePrompt(stock, resolved.effectiveModel),
+      lastMessagePath,
     });
+    const result = spawnSync(
+      resolved.binary.path,
+      args,
+      analyzeSpawnOptions(root),
+    );
 
-    if (result.status !== 0) {
+    if (result.error || result.status !== 0 || result.signal) {
       json(res, 500, {
         stage: "codex",
         status: result.status,
+        signal: result.signal ?? null,
+        error: result.error ? String(result.error.message ?? result.error) : null,
         stdout: result.stdout,
         stderr: result.stderr,
         command: [resolved.binary.path, ...args.slice(0, -1), "<prompt>"].join(" "),
         model: resolved.effectiveModel,
         runPath: runPathFor(symbol),
+        lastMessagePath,
+        hint:
+          result.signal === "SIGTERM"
+            ? "Codex timed out (25m). Check network/auth or re-run analyze."
+            : "Headless exec uses approval_policy=never + empty mcp_servers. Inspect stderr/last message.",
       });
       return;
     }

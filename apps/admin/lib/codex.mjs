@@ -149,3 +149,54 @@ export function codexVersion(binaryPath) {
   });
   return (result.stdout || result.stderr || "").trim() || null;
 }
+
+/**
+ * Non-interactive `codex exec` args for admin analyze.
+ * Forces no approval prompts and empty MCP list so headless runs don't hang
+ * on interactive-feedback / browser / node_repl MCP servers from ~/.codex.
+ */
+export function buildAnalyzeExecArgs({
+  model,
+  workspace,
+  prompt,
+  lastMessagePath = null,
+}) {
+  const args = [
+    "exec",
+    "-m",
+    model,
+    "-C",
+    workspace,
+    "--sandbox",
+    "workspace-write",
+    "--color",
+    "never",
+    // Headless automation: never block on approval UI
+    "-c",
+    'approval_policy="never"',
+    // Disable user MCP servers (many require interactive approve / hang)
+    "-c",
+    "mcp_servers={}",
+    // Avoid desktop notify hooks in non-interactive spawn
+    "-c",
+    "notify=[]",
+  ];
+  if (lastMessagePath) {
+    args.push("-o", lastMessagePath);
+  }
+  args.push(prompt);
+  return args;
+}
+
+/** spawnSync options for long-running analyze (no stdin hang). */
+export function analyzeSpawnOptions(workspace, timeoutMs = 25 * 60 * 1000) {
+  return {
+    cwd: workspace,
+    encoding: "utf8",
+    env: process.env,
+    maxBuffer: 32 * 1024 * 1024,
+    timeout: timeoutMs,
+    // Critical: without this, codex may wait for more stdin forever
+    stdio: ["ignore", "pipe", "pipe"],
+  };
+}

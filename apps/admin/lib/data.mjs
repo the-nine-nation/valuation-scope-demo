@@ -153,14 +153,16 @@ export function runPathFor(symbol) {
 export function analyzePrompt(stock, analysisModel) {
   const outPath = `data/anysis/runs/${stock.symbol}.json`;
   return [
-    `你是本仓库的价值投资分析执行器。请严格按 data/anysis/charlie-munger-value-investing skill 用中文分析【${stock.name} ${stock.symbol}】。`,
+    `你是本仓库的价值投资分析执行器（非交互自动化）。请严格按 data/anysis/charlie-munger-value-investing skill 用中文分析【${stock.name} ${stock.symbol}】。`,
     "",
     "## 硬性交付（缺一不可）",
-    `1. 完成研究后，把**机器可读**结果写入仓库文件：\`${outPath}\`（JSON，UTF-8）。`,
-    "2. **不要**直接编辑 data/stocks.source.json 里其他股票；入库由脚本 `node tools/scripts/ingest-analysis.mjs` 完成。",
-    "3. **不要**写入 currentPrice / asOf / valuation。",
+    `1. 完成研究后，把**机器可读**结果写入仓库文件：\`${outPath}\`（JSON，UTF-8，合法 JSON，不要包 markdown 代码围栏）。`,
+    "2. **不要**直接编辑 data/stocks.source.json；入库由脚本完成。",
+    "3. **不要**写入 currentPrice / asOf / 顶层 valuation 字段。",
     "4. **不要** git commit / push。",
     "5. bands 必须正好 5 档；analysis.business / financials / valuation 各 ≥20 字中文。",
+    "6. analysis.model 填你使用的模型 slug；analysis.analyzedAt 填今天日期 YYYY-MM-DD。",
+    "7. 写完文件后立即结束，不要再开长对话或调用外部 MCP。",
     "",
     "## JSON 合同（写入 run 文件时必须符合）",
     ANALYSIS_RUN_CONTRACT,
@@ -171,7 +173,7 @@ export function analyzePrompt(stock, analysisModel) {
     `- 市场：${stock.market}`,
     `- 行业：${stock.industry}`,
     "",
-    `分析模型：${analysisModel}。写完 ${outPath} 即可结束；管理页会自动 ingest → seed → 仅 push source。`,
+    `分析模型：${analysisModel}。唯一成功条件：磁盘上出现合法的 ${outPath}。`,
   ].join("\n");
 }
 
