@@ -98,14 +98,17 @@
       .preview.show { display: block; }
       .preview strong { font-size: 1.05rem; }
       .preview .meta { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
+      .job-list { display: grid; gap: 12px; }
       .job-panel {
         border: 1px solid #bfdbfe;
         background: #f8fbff;
         border-radius: 12px;
         padding: 12px 14px;
-        margin-top: 12px;
       }
-      .job-panel h3 { margin: 0 0 8px; font-size: 0.95rem; }
+      .job-panel.done { border-color: #a7f3d0; background: #f0fdf4; }
+      .job-panel.error { border-color: #fecaca; background: #fef2f2; }
+      .job-panel h3 { margin: 0 0 8px; font-size: 0.95rem; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+      .job-panel h3 .dismiss { font-size: 0.75rem; color: var(--muted); cursor: pointer; border: 0; background: transparent; padding: 0; text-decoration: underline; }
       .job-meta { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
       .progress-bar {
         height: 8px;
@@ -122,8 +125,10 @@
         border-radius: 999px;
         transition: width 0.35s ease;
       }
+      .job-panel.error .progress-bar > i { background: linear-gradient(90deg, #b91c1c, #ea580c); }
+      .job-panel.done .progress-bar > i { background: linear-gradient(90deg, #047857, #0f766e); }
       .job-logs {
-        max-height: 180px;
+        max-height: 140px;
         overflow: auto;
         margin: 0;
         background: #0c0a09;
@@ -132,6 +137,7 @@
         padding: 10px;
         font-size: 0.75rem;
       }
+      .job-empty { color: var(--muted); font-size: 0.85rem; margin: 0; }
     </style>
   </head>
   <body>
@@ -204,13 +210,9 @@
         </section>
 
         <section class="card" id="jobCard" style="display:none">
-          <h2>分析进度</h2>
-          <div class="job-panel" id="jobPanel">
-            <h3 id="jobTitle">—</h3>
-            <div class="job-meta" id="jobMeta"></div>
-            <div class="progress-bar"><i id="jobBar"></i></div>
-            <pre class="job-logs" id="jobLogs"></pre>
-          </div>
+          <h2>分析进度 <span id="jobCount" class="badge run">0</span></h2>
+          <p class="hint" style="margin-top:0">可同时分析多只股票；下方每只独立进度卡片。</p>
+          <div class="job-list" id="jobList"></div>
         </section>
 
         <section class="card">
@@ -240,8 +242,10 @@
       const logEl = document.getElementById("log");
       let codexState = null;
       let pendingLookup = null;
-      /** @type {string|null} */
-      let watchingJobId = null;
+      /** @type {Set<string>} */
+      const watchingJobIds = new Set();
+      /** @type {Map<string, object>} id -> last job snapshot */
+      const jobSnapshots = new Map();
       let pollTimer = null;
 
       const STAGE_PCT = {
@@ -349,26 +353,92 @@
         return `${Math.floor(s / 60)}m ${s % 60}s`;
       }
 
-      function renderJob(job) {
+      function jobSortKey(job) {
+        const active = job.status === "queued" || job.status === "running" ? 0 : 1;
+        return [active, -(job.updatedAt || 0)];
+      }
+
+      function renderJobs() {
         const card = document.getElementById("jobCard");
-        if (!job) {
+        const list = document.getElementById("jobList");
+        const jobs = [...jobSnapshots.values()].sort((a, b) => {
+          const ka = jobSortKey(a);
+          const kb = jobSortKey(b);
+          return ka[0] - kb[0] || ka[1] - kb[1];
+        });
+        const activeCount = jobs.filter(
+          (j) => j.status === "queued" || j.status === "running",
+        ).length;
+
+        if (jobs.length === 0) {
           card.style.display = "none";
+          list.innerHTML = "";
+          document.getElementById("jobCount").textContent = "0";
           return;
         }
+
         card.style.display = "";
-        document.getElementById("jobTitle").textContent =
-          `${job.symbol} ${job.name || ""} · ${job.status} / ${job.stage}`;
-        document.getElementById("jobMeta").innerHTML =
-          `model <strong>${job.model}</strong> · reasoning <strong>${job.reasoningEffort}</strong>` +
-          (job.pid ? ` · pid ${job.pid}` : "") +
-          (job.tokensUsed != null ? ` · tokens ~${job.tokensUsed}` : "") +
-          ` · 已用 ${formatElapsed(job.elapsedMs)}` +
-          (job.error ? `<br><span class="bad">${job.error}</span>` : "") +
-          (job.lastEvent ? `<br>最近：${job.lastEvent}` : "");
-        const pct = STAGE_PCT[job.stage] ?? 20;
-        document.getElementById("jobBar").style.width = `${pct}%`;
-        const logs = (job.logs || []).slice(-40).join("\n") || "（尚无事件）";
-        document.getElementById("jobLogs").textContent = logs;
+        document.getElementById("jobCount").textContent = String(
+          activeCount || jobs.length,
+        );
+        document.getElementById("jobCount").className =
+          activeCount > 0 ? "badge run" : "badge";
+
+        list.innerHTML = "";
+        for (const job of jobs) {
+          const panel = document.createElement("div");
+          panel.className = "job-panel";
+          if (job.status === "done") panel.classList.add("done");
+          if (job.status === "error") panel.classList.add("error");
+          panel.dataset.jobId = job.id;
+
+          const title = document.createElement("h3");
+          const titleText = document.createElement("span");
+          titleText.textContent = `${job.symbol} ${job.name || ""} · ${job.status} / ${job.stage}`;
+          title.append(titleText);
+
+          const terminal = job.status === "done" || job.status === "error";
+          if (terminal) {
+            const dismiss = document.createElement("button");
+            dismiss.type = "button";
+            dismiss.className = "dismiss";
+            dismiss.textContent = "关闭";
+            dismiss.onclick = () => {
+              jobSnapshots.delete(job.id);
+              watchingJobIds.delete(job.id);
+              renderJobs();
+              ensurePoll();
+            };
+            title.append(dismiss);
+          }
+          panel.append(title);
+
+          const meta = document.createElement("div");
+          meta.className = "job-meta";
+          meta.innerHTML =
+            `model <strong>${job.model}</strong> · reasoning <strong>${job.reasoningEffort}</strong>` +
+            (job.pid ? ` · pid ${job.pid}` : "") +
+            (job.tokensUsed != null ? ` · tokens ~${job.tokensUsed}` : "") +
+            ` · 已用 ${formatElapsed(job.elapsedMs)}` +
+            (job.error ? `<br><span class="bad">${job.error}</span>` : "") +
+            (job.lastEvent ? `<br>最近：${job.lastEvent}` : "");
+          panel.append(meta);
+
+          const barWrap = document.createElement("div");
+          barWrap.className = "progress-bar";
+          const bar = document.createElement("i");
+          bar.style.width = `${STAGE_PCT[job.stage] ?? 20}%`;
+          barWrap.append(bar);
+          panel.append(barWrap);
+
+          const logs = document.createElement("pre");
+          logs.className = "job-logs";
+          logs.textContent =
+            (job.logs || []).slice(-40).join("\n") || "（尚无事件）";
+          panel.append(logs);
+
+          list.append(panel);
+        }
       }
 
       function stopPoll() {
@@ -378,27 +448,96 @@
         }
       }
 
-      async function pollJobOnce() {
-        if (!watchingJobId) return;
-        try {
-          const job = await api(`/api/jobs/${watchingJobId}`);
-          renderJob(job);
-          if (job.status === "done" || job.status === "error") {
-            stopPoll();
-            watchingJobId = null;
-            log(job.result || job);
-            await loadStocks();
-          }
-        } catch (e) {
-          log(String(e.message || e));
+      function ensurePoll() {
+        const hasActive = [...watchingJobIds].some((id) => {
+          const j = jobSnapshots.get(id);
+          return !j || j.status === "queued" || j.status === "running";
+        });
+        if (!hasActive) {
+          stopPoll();
+          return;
+        }
+        if (!pollTimer) {
+          pollTimer = setInterval(() => {
+            void pollJobsOnce();
+          }, 2000);
         }
       }
 
-      function watchJob(jobId) {
-        watchingJobId = jobId;
-        stopPoll();
-        pollJobOnce();
-        pollTimer = setInterval(pollJobOnce, 2000);
+      async function pollJobsOnce() {
+        if (watchingJobIds.size === 0) {
+          stopPoll();
+          return;
+        }
+        const ids = [...watchingJobIds];
+        let anyFinished = false;
+        await Promise.all(
+          ids.map(async (id) => {
+            try {
+              const job = await api(`/api/jobs/${id}`);
+              jobSnapshots.set(id, job);
+              if (job.status === "done" || job.status === "error") {
+                anyFinished = true;
+                // keep terminal card until user dismisses; stop re-polling this id
+                watchingJobIds.delete(id);
+              }
+            } catch (e) {
+              const prev = jobSnapshots.get(id);
+              if (prev) {
+                jobSnapshots.set(id, {
+                  ...prev,
+                  status: "error",
+                  stage: "error",
+                  error: String(e.message || e),
+                  lastEvent: String(e.message || e),
+                });
+              }
+              watchingJobIds.delete(id);
+              anyFinished = true;
+            }
+          }),
+        );
+        renderJobs();
+        ensurePoll();
+        if (anyFinished) {
+          const finished = [...jobSnapshots.values()].filter(
+            (j) => j.status === "done" || j.status === "error",
+          );
+          if (finished.length) {
+            log({
+              jobsFinished: finished.map((j) => ({
+                id: j.id,
+                symbol: j.symbol,
+                status: j.status,
+                error: j.error,
+                result: j.result,
+              })),
+            });
+          }
+          await loadStocks({ skipResumeJobs: true });
+        }
+      }
+
+      function watchJob(jobId, seedJob) {
+        if (!jobId) return;
+        watchingJobIds.add(jobId);
+        if (seedJob) jobSnapshots.set(jobId, seedJob);
+        else if (!jobSnapshots.has(jobId)) {
+          jobSnapshots.set(jobId, {
+            id: jobId,
+            symbol: "…",
+            name: "",
+            status: "queued",
+            stage: "queued",
+            model: "—",
+            reasoningEffort: "—",
+            logs: [],
+            elapsedMs: 0,
+          });
+        }
+        renderJobs();
+        void pollJobsOnce();
+        ensurePoll();
       }
 
       async function loadSettings() {
@@ -485,18 +624,29 @@
         return `${price != null ? "¥" + price : "—"}<div style="color:#78716c;font-size:12px">${tag} ${asOf || ""}</div>`;
       }
 
-      async function loadStocks() {
+      async function loadStocks(opts = {}) {
         const data = await api("/api/stocks");
         document.getElementById("count").textContent = String(data.stocks.length);
         const tbody = document.getElementById("rows");
         tbody.innerHTML = "";
 
-        // Resume watching if any active job
-        const active = (data.jobs || []).find(
-          (j) => j.status === "running" || j.status === "queued",
-        );
-        if (active && !watchingJobId) {
-          watchJob(active.id);
+        // Resume watching ALL active jobs (multi-stock parallel)
+        if (!opts.skipResumeJobs) {
+          const activeJobs = (data.jobs || []).filter(
+            (j) => j.status === "running" || j.status === "queued",
+          );
+          for (const job of activeJobs) {
+            if (!watchingJobIds.has(job.id)) watchJob(job.id, job);
+            else jobSnapshots.set(job.id, job);
+          }
+          // also hydrate row-level activeJob if missing from jobs list
+          for (const stock of data.stocks) {
+            if (stock.activeJob?.id && !watchingJobIds.has(stock.activeJob.id)) {
+              watchJob(stock.activeJob.id, stock.activeJob);
+            }
+          }
+          renderJobs();
+          ensurePoll();
         }
 
         for (const stock of data.stocks) {
@@ -529,16 +679,16 @@
             try {
               const result = await api(`/api/analyze/${stock.symbol}`, { method: "POST" });
               log(result);
-              if (result.job?.id) watchJob(result.job.id);
-              await loadStocks();
+              if (result.job?.id) watchJob(result.job.id, result.job);
+              await loadStocks({ skipResumeJobs: true });
             } catch (e) {
               if (e.status === 409 && e.data?.job?.id) {
                 log(e.data);
-                watchJob(e.data.job.id);
+                watchJob(e.data.job.id, e.data.job);
               } else {
                 log(String(e.message || e));
+                analyzeBtn.disabled = false;
               }
-              analyzeBtn.disabled = false;
             }
           };
           const delBtn = document.createElement("button");
