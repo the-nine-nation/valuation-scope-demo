@@ -23,6 +23,7 @@
     "lookup": "node tools/scripts/lookup-stock.mjs",
     "analysis:ingest": "node tools/scripts/ingest-analysis.mjs",
     "analysis:push": "node tools/scripts/push-source.mjs",
+    "prices:trigger": "node tools/scripts/trigger-prices-workflow.mjs --local-fallback",
     "test": "npm run build && node --test tools/tests/rendered-html.test.mjs tools/tests/analysis-pipeline.test.mjs",
     "lint": "npm run lint --prefix apps/web"
   },
