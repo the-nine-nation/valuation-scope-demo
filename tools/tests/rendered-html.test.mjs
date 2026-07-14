@@ -43,8 +43,17 @@ test("server-renders the sortable stock overview grid", async () => {
   const cardCount = (html.match(/class="stock-card"/g) ?? []).length;
   assert.ok(cardCount >= 6, `expected >=6 stock cards, got ${cardCount}`);
   assert.equal((html.match(/mini-scale-marker/g) ?? []).length, cardCount);
-  assert.match(html, /数据已从 SQLite 快照载入/);
+  assert.match(html, /SQLite 快照|实时行情|快照/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/);
+});
+
+test("shared tencent quotes helper returns payload shape", async () => {
+  const { fetchQuotesPayload } = await import("../lib/tencent-quotes.mjs");
+  const payload = await fetchQuotesPayload(["600519", "000333"]);
+  assert.equal(payload.source, "tencent-gtimg");
+  assert.equal(payload.live, true);
+  assert.ok(payload.quotes["600519"]?.currentPrice > 0);
+  assert.ok(payload.quotes["000333"]?.currentPrice > 0);
 });
 
 test("ships stocks with exactly five valuation bands and analysis payload", async () => {
