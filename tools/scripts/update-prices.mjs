@@ -2,73 +2,14 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  fetchTencentQuotes,
+  quotesBySymbol,
+} from "../lib/tencent-quotes.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const sourcePath = resolve(root, "data/stocks.source.json");
 const pricesPath = resolve(root, "data/prices.snapshot.json");
-
-function exchangePrefix(symbol) {
-  if (symbol.startsWith("6") || symbol.startsWith("9") || symbol.startsWith("5")) {
-    return "sh";
-  }
-  return "sz";
-}
-
-function quoteKey(symbol) {
-  return `${exchangePrefix(symbol)}${symbol}`;
-}
-
-function formatAsOf(raw) {
-  if (!raw) {
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Shanghai",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date());
-  }
-  const digits = String(raw).replace(/\D/g, "");
-  if (digits.length >= 8) {
-    return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
-  }
-  return String(raw);
-}
-
-function parseTencentQuotes(text) {
-  const quotes = new Map();
-  for (const line of text.split("\n")) {
-    const match = line.match(/^v_([a-z]{2}\d+)="(.*)";?\s*$/i);
-    if (!match) continue;
-    const fields = match[2].split("~");
-    const price = Number.parseFloat(fields[3]);
-    if (!Number.isFinite(price) || price <= 0) continue;
-    quotes.set(match[1].toLowerCase(), {
-      price,
-      asOf: formatAsOf(fields[30] || fields[31]),
-    });
-  }
-  return quotes;
-}
-
-async function fetchQuotes(symbols) {
-  const keys = symbols.map(quoteKey);
-  const url = `https://qt.gtimg.cn/q=${keys.join(",")}`;
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "valuation-scope-demo/0.1",
-      Referer: "https://finance.qq.com/",
-    },
-  });
-  if (!response.ok) {
-    throw new Error(`Quote request failed: HTTP ${response.status}`);
-  }
-  const text = await response.text();
-  const quotes = parseTencentQuotes(text);
-  if (quotes.size === 0) {
-    throw new Error("Quote response contained no usable prices");
-  }
-  return quotes;
-}
 
 function loadExistingPrices() {
   if (!existsSync(pricesPath)) {
@@ -113,14 +54,15 @@ if (!Array.isArray(stocks) || stocks.length === 0) {
 
 const symbols = stocks.map((stock) => stock.symbol);
 const nameBySymbol = new Map(stocks.map((stock) => [stock.symbol, stock.name]));
-const liveQuotes = await fetchQuotes(symbols);
+const liveMap = await fetchTencentQuotes(symbols);
+const liveQuotes = quotesBySymbol(symbols, liveMap);
 const previous = loadExistingPrices();
 const nextQuotes = {};
 let changed = 0;
 let latestAsOf = null;
 
 for (const symbol of symbols) {
-  const live = liveQuotes.get(quoteKey(symbol));
+  const live = liveQuotes[symbol];
   const prev = previous.quotes[symbol];
   const name = nameBySymbol.get(symbol) ?? symbol;
 
@@ -138,7 +80,7 @@ for (const symbol of symbols) {
     continue;
   }
 
-  const nextPrice = Math.round(live.price * 100) / 100;
+  const nextPrice = live.currentPrice;
   const nextAsOf = live.asOf;
   const prevPrice = prev?.currentPrice;
   const prevAsOf = prev?.asOf;
