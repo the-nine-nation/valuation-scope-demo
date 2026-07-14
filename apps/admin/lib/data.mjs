@@ -2,7 +2,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { ANALYSIS_RUN_CONTRACT } from "../../../tools/scripts/analysis-schema.mjs";
+import {
+  ANALYSIS_RUN_CONTRACT,
+  REQUIRED_SKILL_STEPS,
+  REQUIRED_SKILL_VERSION,
+} from "../../../tools/scripts/analysis-schema.mjs";
 import { ingestAnalysis } from "../../../tools/scripts/ingest-analysis.mjs";
 import { pushSource } from "../../../tools/scripts/push-source.mjs";
 import { lookupStock } from "../../../tools/scripts/lookup-stock.mjs";
@@ -162,8 +166,20 @@ export function runPathFor(symbol) {
 
 export function analyzePrompt(stock, analysisModel) {
   const outPath = `data/anysis/runs/${stock.symbol}.json`;
+  const skillRoot = "data/anysis/charlie-munger-value-investing";
   return [
-    `你是本仓库的价值投资分析执行器（非交互自动化）。请严格按 data/anysis/charlie-munger-value-investing skill 用中文分析【${stock.name} ${stock.symbol}】。`,
+    `你是本仓库的价值投资分析执行器（非交互自动化）。请严格按 ${skillRoot} skill 用中文分析【${stock.name} ${stock.symbol}】。`,
+    "",
+    "## Skill 必读（按序，不要跳过）",
+    `1. 先读 \`${skillRoot}/SKILL.md\` 全文。`,
+    `2. 按需加载 references：mental-models / data-checklist / valuation-framework / analysis-workflow / report-template / principles-checklist。`,
+    `3. 按 SKILL 执行流程 0–10 完成研究；不得只套 JSON 模板空写。`,
+    "",
+    "## 研究工具（只读，允许）",
+    "- 可用内置 **web_search**（cached/live）查公开年报、中报、公告、同业与估值背景。",
+    "- 可用 shell 读本仓库文件（skill、价格快照、既有 source 字段）。",
+    "- **禁止** 安装依赖、改系统、git commit/push、调用用户 MCP、打开需要交互批准的工具。",
+    "- 若某数据查不到：在 analysis.sources 写明缺口，并加大安全边际或降低结论置信度。",
     "",
     "## 硬性交付（缺一不可）",
     `1. 完成研究后，把**机器可读**结果写入仓库文件：\`${outPath}\`（JSON，UTF-8，合法 JSON，不要包 markdown 代码围栏）。`,
@@ -171,10 +187,13 @@ export function analyzePrompt(stock, analysisModel) {
     "3. **不要**写入 currentPrice / asOf / 顶层 valuation 字段。",
     "4. **不要** git commit / push。",
     "5. bands 必须正好 5 档；analysis.business / financials / valuation 各 ≥20 字中文。",
-    "6. analysis.model 填你使用的模型 slug；analysis.analyzedAt 填今天日期 YYYY-MM-DD。",
-    "7. 写完文件后立即结束，不要再开长对话或调用外部 MCP。",
+    "6. analysis.model 填你使用的模型 slug；analysis.analyzedAt 填今天日期 YYYY-MM-DD（Asia/Shanghai）。",
+    `7. analysis.skillVersion 必须精确为 \`${REQUIRED_SKILL_VERSION}\`。`,
+    `8. analysis.stepsCompleted 必须包含全部步骤 id（可多不可少）：${REQUIRED_SKILL_STEPS.join(", ")}。`,
+    "9. analysis.sources ≥ 2 条；每条至少 title；尽量填 url + asOf + kind（filing|quote|peer|news|other）。",
+    "10. 写完文件后立即结束，不要再开长对话。",
     "",
-    "## JSON 合同（写入 run 文件时必须符合）",
+    "## JSON 合同（写入 run 文件时必须符合；ingest 会硬校验 audit 字段）",
     ANALYSIS_RUN_CONTRACT,
     "",
     `## 标的`,
@@ -183,7 +202,7 @@ export function analyzePrompt(stock, analysisModel) {
     `- 市场：${stock.market}`,
     `- 行业：${stock.industry}`,
     "",
-    `分析模型：${analysisModel}。唯一成功条件：磁盘上出现合法的 ${outPath}。`,
+    `分析模型：${analysisModel}。唯一成功条件：磁盘上出现可通过 ingest 校验的 ${outPath}。`,
   ].join("\n");
 }
 

@@ -154,6 +154,11 @@ export function codexVersion(binaryPath) {
  * Non-interactive `codex exec` args for admin analyze.
  * Forces no approval prompts and empty MCP list so headless runs don't hang
  * on interactive-feedback / browser / node_repl MCP servers from ~/.codex.
+ *
+ * Research access (selective, still headless):
+ * - web_search = "live" → built-in search tool for filings/news
+ * - sandbox_workspace_write.network_access = true → shell can curl public pages
+ * User MCP stays disabled (no interactive-feedback / computer-use hang).
  */
 export function buildAnalyzeExecArgs({
   model,
@@ -162,8 +167,14 @@ export function buildAnalyzeExecArgs({
   lastMessagePath = null,
   reasoningEffort = "medium",
   jsonEvents = true,
+  /** @type {'disabled'|'cached'|'live'} */
+  webSearch = "live",
+  networkAccess = true,
 }) {
   const effort = String(reasoningEffort || "medium").trim() || "medium";
+  const searchMode = ["disabled", "cached", "live"].includes(String(webSearch))
+    ? String(webSearch)
+    : "live";
   const args = [
     "exec",
     "-m",
@@ -186,7 +197,14 @@ export function buildAnalyzeExecArgs({
     // User default is high; analysis wants medium unless overridden
     "-c",
     `model_reasoning_effort="${effort}"`,
+    // Built-in web search for public filings / comps (not user MCP)
+    "-c",
+    `web_search="${searchMode}"`,
   ];
+  if (networkAccess) {
+    // Allow outbound HTTP from sandboxed shell (curl public pages)
+    args.push("-c", "sandbox_workspace_write.network_access=true");
+  }
   if (jsonEvents) {
     args.push("--json");
   }
