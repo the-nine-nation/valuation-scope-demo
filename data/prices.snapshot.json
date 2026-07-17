@@ -1,46 +1,46 @@
 {
   "asOf": "2026-07-17",
-  "updatedAt": "2026-07-17T06:08:55.255Z",
+  "updatedAt": "2026-07-17T08:32:11.533Z",
   "source": "tencent-gtimg",
   "quotes": {
     "600585": {
-      "currentPrice": 17.63,
+      "currentPrice": 17.67,
       "asOf": "2026-07-17"
     },
     "600690": {
-      "currentPrice": 20.97,
+      "currentPrice": 20.95,
       "asOf": "2026-07-17"
     },
     "600941": {
-      "currentPrice": 93.63,
+      "currentPrice": 93.4,
       "asOf": "2026-07-17"
     },
     "600999": {
-      "currentPrice": 19.16,
+      "currentPrice": 18.92,
       "asOf": "2026-07-17"
     },
     "601318": {
-      "currentPrice": 50.77,
+      "currentPrice": 50.7,
       "asOf": "2026-07-17"
     },
     "601600": {
-      "currentPrice": 8.47,
+      "currentPrice": 8.44,
       "asOf": "2026-07-17"
     },
     "601601": {
-      "currentPrice": 29.84,
+      "currentPrice": 29.75,
       "asOf": "2026-07-17"
     },
     "603605": {
-      "currentPrice": 57.02,
+      "currentPrice": 56.73,
       "asOf": "2026-07-17"
     },
     "002027": {
-      "currentPrice": 5.02,
+      "currentPrice": 5,
       "asOf": "2026-07-17"
     },
     "002049": {
-      "currentPrice": 66.15,
+      "currentPrice": 64.1,
       "asOf": "2026-07-17"
     },
     "000333": {
@@ -48,7 +48,7 @@
       "asOf": "2026-07-17"
     },
     "000001": {
-      "currentPrice": 10.76,
+      "currentPrice": 10.78,
       "asOf": "2026-07-17"
     }
   }
